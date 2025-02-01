@@ -1,9 +1,9 @@
 # Set paths
-$airsimExePath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe"
-$environmentsPath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
-$traversalPath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
-$airsimProcessName = "AirsimExe"
-$pythonVenvPath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
+$airsimExePath      = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe"
+$environmentsPath   = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
+$traversalPath      = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
+$airsimProcessName  = "AirsimExe"
+$pythonVenvPath     = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
 
 # Function to check if a process is running
 function Is-ProcessRunning($processName) {
@@ -18,6 +18,7 @@ function Select-File($path, $description) {
         return $null
     }
 
+    # Use the backtick for a newline
     Write-Output "`nSelect a $description file to run (or enter 0 to skip):"
     for ($i = 0; $i -lt $files.Count; $i++) {
         Write-Output "$($i+1): $(Split-Path -Leaf $files[$i])"
@@ -28,7 +29,7 @@ function Select-File($path, $description) {
         Write-Output "Skipping $description step."
         return $null
     } elseif ($selection -match '^\d+$' -and [int]$selection -ge 1 -and [int]$selection -le $files.Count) {
-        return $files[[int]$selection - 1]  # Ensure single string return
+        return $files[[int]$selection - 1]
     } else {
         Write-Output "Invalid selection. Skipping..."
         return $null
@@ -38,6 +39,7 @@ function Select-File($path, $description) {
 # Step 0: Activate Python Virtual Environment (Only if Not Already Active)
 if (-not $env:VIRTUAL_ENV) {
     Write-Output "Activating Python virtual environment..."
+    # Using escaped quotes for the call command in case of spaces in the path
     cmd.exe /c "call `"$pythonVenvPath`""
 } else {
     Write-Output "Virtual environment is already active."
@@ -67,15 +69,16 @@ if (Is-ProcessRunning $airsimProcessName) {
 $envFile = Select-File $environmentsPath "Environment"
 if ($envFile) {
     Write-Output "Running $envFile..."
-    Start-Process -NoNewWindow -FilePath "python" -ArgumentList "`"$envFile`""  # Runs Python files correctly
+    # Pass the file path without extra quotes
+    Start-Process -NoNewWindow -FilePath "python" -ArgumentList $envFile
 }
 
-# Step 3: Select and run a Traversal file (always allows multiple runs)
+# Step 3: Select and run a Traversal file (allows multiple runs)
 do {
     $traversalFile = Select-File $traversalPath "Traversal"
     if ($traversalFile) {
         Write-Output "Running $traversalFile..."
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList "`"$traversalFile`""
+        Start-Process -NoNewWindow -FilePath "python" -ArgumentList $traversalFile
     }
     $runAnother = Read-Host "Do you want to run another traversal? (y/n)"
 } while ($runAnother -eq "y")
