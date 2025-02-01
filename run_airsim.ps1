@@ -41,7 +41,7 @@ if (Test-Path $airSimExePath) {
     $userInput = Read-Host "Do you want to run AirSimExe.exe? (Press Enter to run or type 'n' to skip)"
     if ($userInput -ne "n") {
         Write-Host "Starting AirSimExe.exe..."
-        Start-Process $airSimExePath
+        Start-Process -FilePath $airSimExePath -ArgumentList "-windowed"
     }
     else {
         Write-Host "Skipping AirSimExe.exe."
