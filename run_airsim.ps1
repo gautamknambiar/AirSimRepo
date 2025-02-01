@@ -1,86 +1,126 @@
-# Set paths
-$airsimExePath      = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe"
-$environmentsPath   = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
-$traversalPath      = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
-$airsimProcessName  = "AirsimExe"
-$pythonVenvPath     = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
+###############################################################################
+# RunTasks.ps1
+#
+# This script performs the following:
+# 1. Activates the virtual environment at:
+#    C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate
+#    (if not already activated)
+#
+# 2. Prompts the user whether to run:
+#    C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe
+#
+# 3. Lists the files in the "Environments" directory and lets the user choose one
+#    to run (or skip by entering "n").
+#
+# 4. Lists the files in the "Traversal" directory and lets the user pick a file to run.
+#
+# 5. Continues to prompt the user if they wish to run additional files in the
+#    "Traversal" directory until they choose to exit (by entering "n").
+###############################################################################
 
-# Function to check if a process is running
-function Is-ProcessRunning($processName) {
-    return Get-Process -Name $processName -ErrorAction SilentlyContinue
-}
-
-# Function to let the user select a file from a directory
-function Select-File($path, $description) {
-    $files = Get-ChildItem -Path $path -File | Select-Object -ExpandProperty FullName
-    if ($files.Count -eq 0) {
-        Write-Output "No files found in $path"
-        return $null
-    }
-
-    # Use the backtick for a newline
-    Write-Output "`nSelect a $description file to run (or enter 0 to skip):"
-    for ($i = 0; $i -lt $files.Count; $i++) {
-        Write-Output "$($i+1): $(Split-Path -Leaf $files[$i])"
-    }
-
-    $selection = Read-Host "Enter the number of the file you want to run"
-    if ($selection -eq "0") {
-        Write-Output "Skipping $description step."
-        return $null
-    } elseif ($selection -match '^\d+$' -and [int]$selection -ge 1 -and [int]$selection -le $files.Count) {
-        return $files[[int]$selection - 1]
-    } else {
-        Write-Output "Invalid selection. Skipping..."
-        return $null
-    }
-}
-
-# Step 0: Activate Python Virtual Environment (Only if Not Already Active)
+#-----------------------------
+# Step 1: Activate virtual environment
+#-----------------------------
+# Check if the virtual environment is already active by testing the VIRTUAL_ENV variable.
 if (-not $env:VIRTUAL_ENV) {
-    Write-Output "Activating Python virtual environment..."
-    # Using escaped quotes for the call command in case of spaces in the path
-    cmd.exe /c "call `"$pythonVenvPath`""
+    Write-Host "Activating virtual environment..."
+    # Dot-source the activation script so that its environment changes affect the current session.
+    . "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
 } else {
-    Write-Output "Virtual environment is already active."
+    Write-Host "Virtual environment already activated."
 }
 
-# Step 1: Start AirSim (if not already running)
-if (Is-ProcessRunning $airsimProcessName) {
-    $startAirsim = Read-Host "AirSim is already running. Do you want to restart it? (y/n)"
-    if ($startAirsim -eq "y") {
-        Write-Output "Restarting AirSim..."
-        Stop-Process -Name $airsimProcessName -Force
-        Start-Process -NoNewWindow -FilePath $airsimExePath -ArgumentList "-windowed"
+#-----------------------------
+# Step 2: Optionally run AirSimExe.exe
+#-----------------------------
+$airSimExePath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe"
+if (Test-Path $airSimExePath) {
+    $userInput = Read-Host "Do you want to run AirSimExe.exe? (Press Enter to run or type 'n' to skip)"
+    if ($userInput -ne "n") {
+        Write-Host "Starting AirSimExe.exe..."
+        Start-Process $airSimExePath
     } else {
-        Write-Output "Skipping AirSim startup."
+        Write-Host "Skipping AirSimExe.exe."
     }
 } else {
-    $startAirsim = Read-Host "Do you want to start AirSim? (y/n)"
-    if ($startAirsim -eq "y") {
-        Write-Output "Starting AirSim..."
-        Start-Process -NoNewWindow -FilePath $airsimExePath -ArgumentList "-windowed"
-    } else {
-        Write-Output "Skipping AirSim startup."
-    }
+    Write-Host "AirSimExe.exe not found at $airSimExePath"
 }
 
-# Step 2: Select and run an Environment file (or skip)
-$envFile = Select-File $environmentsPath "Environment"
-if ($envFile) {
-    Write-Output "Running $envFile..."
-    # Pass the file path without extra quotes
-    Start-Process -NoNewWindow -FilePath "python" -ArgumentList $envFile
+#-----------------------------
+# Step 3: Pick a file from the Environments directory
+#-----------------------------
+$environmentsDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
+if (Test-Path $environmentsDir) {
+    $envFiles = Get-ChildItem -Path $environmentsDir -File
+    if ($envFiles.Count -gt 0) {
+        Write-Host "Files in the Environments directory:"
+        for ($i = 0; $i -lt $envFiles.Count; $i++) {
+            Write-Host "  [$i] $($envFiles[$i].Name)"
+        }
+        $choice = Read-Host "Enter the index of the file to run, or type 'n' to skip"
+        if ($choice -ne "n") {
+            if ($choice -match '^\d+$' -and [int]$choice -ge 0 -and [int]$choice -lt $envFiles.Count) {
+                $selectedEnvFile = $envFiles[[int]$choice].FullName
+                Write-Host "Running file: $selectedEnvFile"
+                & $selectedEnvFile
+            }
+            else {
+                Write-Host "Invalid selection. Skipping execution in Environments."
+            }
+        }
+        else {
+            Write-Host "Skipping file execution in Environments."
+        }
+    }
+    else {
+        Write-Host "No files found in the Environments directory."
+    }
+}
+else {
+    Write-Host "Environments directory not found: $environmentsDir"
 }
 
-# Step 3: Select and run a Traversal file (allows multiple runs)
-do {
-    $traversalFile = Select-File $traversalPath "Traversal"
-    if ($traversalFile) {
-        Write-Output "Running $traversalFile..."
-        Start-Process -NoNewWindow -FilePath "python" -ArgumentList $traversalFile
+#-----------------------------
+# Steps 4 & 5: Pick files from the Traversal directory in a loop
+#-----------------------------
+$traversalDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
+if (Test-Path $traversalDir) {
+    while ($true) {
+        $traversalFiles = Get-ChildItem -Path $traversalDir -File
+        if ($traversalFiles.Count -eq 0) {
+            Write-Host "No files found in the Traversal directory."
+            break
+        }
+        
+        Write-Host "`nFiles in the Traversal directory:"
+        for ($i = 0; $i -lt $traversalFiles.Count; $i++) {
+            Write-Host "  [$i] $($traversalFiles[$i].Name)"
+        }
+        
+        $choiceTraversal = Read-Host "Enter the index of the file to run, or type 'n' to exit the Traversal loop"
+        if ($choiceTraversal -eq "n") {
+            Write-Host "Exiting the Traversal file execution loop."
+            break
+        }
+        
+        if ($choiceTraversal -match '^\d+$' -and [int]$choiceTraversal -ge 0 -and [int]$choiceTraversal -lt $traversalFiles.Count) {
+            $selectedTraversalFile = $traversalFiles[[int]$choiceTraversal].FullName
+            Write-Host "Running file: $selectedTraversalFile"
+            & $selectedTraversalFile
+        }
+        else {
+            Write-Host "Invalid selection. Please try again."
+            continue
+        }
+        
+        # Ask if the user wants to run another file from the Traversal directory.
+        $runAnother = Read-Host "Do you want to run another file from the Traversal directory? (y/n)"
+        if ($runAnother -eq "n") {
+            Write-Host "Exiting the Traversal file execution loop."
+            break
+        }
     }
-    $runAnother = Read-Host "Do you want to run another traversal? (y/n)"
-} while ($runAnother -eq "y")
-
-Write-Output "Script execution complete."
+}
+else {
+    Write-Host "Traversal directory not found: $traversalDir"
+}
