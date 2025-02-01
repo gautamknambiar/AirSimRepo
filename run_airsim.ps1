@@ -2,33 +2,36 @@
 # RunTasks.ps1
 #
 # This script performs the following:
-# 1. Activates the virtual environment at:
-#    C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate
-#    (if not already activated)
 #
-# 2. Prompts the user whether to run:
-#    C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe
+# 1. Checks if the Python virtual environment is activated.
+#    If not, it instructs the user how to activate it and then exits.
 #
-# 3. Lists the files in the "Environments" directory and lets the user choose one
-#    to run (or skip by entering "n").
+# 2. Optionally runs AirSimExe.exe.
 #
-# 4. Lists the files in the "Traversal" directory and lets the user pick a file to run.
+# 3. Lists Python files in the "Environments" directory and allows the user
+#    to select one to run with: "python <selected file>".
 #
-# 5. Continues to prompt the user if they wish to run additional files in the
-#    "Traversal" directory until they choose to exit (by entering "n").
+# 4. Lists Python files in the "Traversal" directory and allows the user
+#    to select files to run with: "python <selected file>", repeating until
+#    the user decides to exit.
 ###############################################################################
 
 #-----------------------------
-# Step 1: Activate virtual environment
+# Step 1: Check if the virtual environment is activated
 #-----------------------------
-# Check if the virtual environment is already active by testing the VIRTUAL_ENV variable.
 if (-not $env:VIRTUAL_ENV) {
-    Write-Host "Activating virtual environment..."
-    # Dot-source the activation script so that its environment changes affect the current session.
-    . "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
-} else {
-    Write-Host "Virtual environment already activated."
+    Write-Host "The Python virtual environment is not activated."
+    Write-Host ""
+    Write-Host "Please activate it by running the following command in your PowerShell session:"
+    Write-Host ""
+    Write-Host "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
+    Write-Host ""
+    Write-Host "After activating the virtual environment, please re-run this script."
+    exit
 }
+
+Write-Host "Python virtual environment is activated."
+Write-Host ""
 
 #-----------------------------
 # Step 2: Optionally run AirSimExe.exe
@@ -39,65 +42,73 @@ if (Test-Path $airSimExePath) {
     if ($userInput -ne "n") {
         Write-Host "Starting AirSimExe.exe..."
         Start-Process $airSimExePath
-    } else {
+    }
+    else {
         Write-Host "Skipping AirSimExe.exe."
     }
-} else {
+}
+else {
     Write-Host "AirSimExe.exe not found at $airSimExePath"
 }
 
+Write-Host ""
+
 #-----------------------------
-# Step 3: Pick a file from the Environments directory
+# Step 3: Pick a Python file from the Environments directory to run
 #-----------------------------
 $environmentsDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
 if (Test-Path $environmentsDir) {
-    $envFiles = Get-ChildItem -Path $environmentsDir -File
+    # Get only Python files (i.e. with a .py extension)
+    $envFiles = Get-ChildItem -Path $environmentsDir -File | Where-Object { $_.Extension -eq ".py" }
     if ($envFiles.Count -gt 0) {
-        Write-Host "Files in the Environments directory:"
+        Write-Host "Python files in the Environments directory:"
         for ($i = 0; $i -lt $envFiles.Count; $i++) {
             Write-Host "  [$i] $($envFiles[$i].Name)"
         }
-        $choice = Read-Host "Enter the index of the file to run, or type 'n' to skip"
+        $choice = Read-Host "Enter the index of the file to run with Python, or type 'n' to skip"
         if ($choice -ne "n") {
             if ($choice -match '^\d+$' -and [int]$choice -ge 0 -and [int]$choice -lt $envFiles.Count) {
                 $selectedEnvFile = $envFiles[[int]$choice].FullName
-                Write-Host "Running file: $selectedEnvFile"
-                & $selectedEnvFile
+                Write-Host "Running: python $selectedEnvFile"
+                python $selectedEnvFile
             }
             else {
-                Write-Host "Invalid selection. Skipping execution in Environments."
+                Write-Host "Invalid selection. Skipping execution in the Environments directory."
             }
         }
         else {
-            Write-Host "Skipping file execution in Environments."
+            Write-Host "Skipping file execution in the Environments directory."
         }
     }
     else {
-        Write-Host "No files found in the Environments directory."
+        Write-Host "No Python files found in the Environments directory."
     }
 }
 else {
     Write-Host "Environments directory not found: $environmentsDir"
 }
 
+Write-Host ""
+
 #-----------------------------
-# Steps 4 & 5: Pick files from the Traversal directory in a loop
+# Step 4: Pick Python files from the Traversal directory in a loop
 #-----------------------------
 $traversalDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
 if (Test-Path $traversalDir) {
     while ($true) {
-        $traversalFiles = Get-ChildItem -Path $traversalDir -File
+        # Get only Python files (i.e. with a .py extension)
+        $traversalFiles = Get-ChildItem -Path $traversalDir -File | Where-Object { $_.Extension -eq ".py" }
         if ($traversalFiles.Count -eq 0) {
-            Write-Host "No files found in the Traversal directory."
+            Write-Host "No Python files found in the Traversal directory."
             break
         }
         
-        Write-Host "`nFiles in the Traversal directory:"
+        Write-Host "`nPython files in the Traversal directory:"
         for ($i = 0; $i -lt $traversalFiles.Count; $i++) {
             Write-Host "  [$i] $($traversalFiles[$i].Name)"
         }
         
-        $choiceTraversal = Read-Host "Enter the index of the file to run, or type 'n' to exit the Traversal loop"
+        $choiceTraversal = Read-Host "Enter the index of the file to run with Python, or type 'n' to exit the Traversal loop"
         if ($choiceTraversal -eq "n") {
             Write-Host "Exiting the Traversal file execution loop."
             break
@@ -105,8 +116,8 @@ if (Test-Path $traversalDir) {
         
         if ($choiceTraversal -match '^\d+$' -and [int]$choiceTraversal -ge 0 -and [int]$choiceTraversal -lt $traversalFiles.Count) {
             $selectedTraversalFile = $traversalFiles[[int]$choiceTraversal].FullName
-            Write-Host "Running file: $selectedTraversalFile"
-            & $selectedTraversalFile
+            Write-Host "Running: python $selectedTraversalFile"
+            python $selectedTraversalFile
         }
         else {
             Write-Host "Invalid selection. Please try again."
