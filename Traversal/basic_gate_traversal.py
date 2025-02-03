@@ -34,14 +34,14 @@ client.simStartRace()
 client.takeoffAsync(vehicle_name="drone_1").join()
 # Example of flying to a fixed arbitrary position, e.g., (x=10, y=10, z=-5).
 # here the arguments for moveToPositionAsync are (x, y, z, velocity, vehicle_name)
-client.moveToPositionAsync(10, 10, -5, 5, vehicle_name="drone_1").join()
+# client.moveToPositionAsync(10, 10, -5, 5, vehicle_name="drone_1").join()
 
 # 5. Fly the drone to each gate's position in a loop.
 # The drone will fly to the x, y, z coordinates of each gate.
 
-# for gate, position in gate_positions.items():
-#     print(f"Flying to {gate} at position {position}")
-#     client.moveToPositionAsync(position.x_val, position.y_val, position.z_val, 5, vehicle_name="drone_1").join()
+for gate, position in gate_positions.items():
+    print(f"Flying to {gate} at position {position}")
+    client.moveToPositionAsync(position.x_val, position.y_val, position.z_val, 5, vehicle_name="drone_1").join()
 
 # Note:
 # - `moveToPositionAsync(x, y, z, velocity)` moves the drone to the specified coordinates (x, y, z) at a certain velocity - try changing the velocity to see how it affects the race time
