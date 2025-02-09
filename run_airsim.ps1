@@ -24,7 +24,7 @@ if (-not $env:VIRTUAL_ENV) {
     Write-Host ""
     Write-Host "Please activate it by running the following command in your PowerShell session:"
     Write-Host ""
-    Write-Host "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\airsimvenv\Scripts\activate"
+    Write-Host "W:\SWARM\airsimvenv\Scripts\activate"
     Write-Host ""
     Write-Host "After activating the virtual environment, please re-run this script."
     exit
@@ -36,7 +36,7 @@ Write-Host ""
 #-----------------------------
 # Step 2: Optionally run AirSimExe.exe
 #-----------------------------
-$airSimExePath = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\SWARMEnv\AirSim\AirSim\AirsimExe.exe"
+$airSimExePath = "W:\SWARM\AirSim\AirSim\AirsimExe.exe"
 if (Test-Path $airSimExePath) {
     $userInput = Read-Host "Do you want to run AirSimExe.exe? (Press Enter to run or type 'n' to skip)"
     if ($userInput -ne "n") {
@@ -56,7 +56,7 @@ Write-Host ""
 #-----------------------------
 # Step 3: Pick a Python file from the Environments directory to run
 #-----------------------------
-$environmentsDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Environments"
+$environmentsDir = "W:\SWARM\AirSimRepo\Environments"
 if (Test-Path $environmentsDir) {
     # Get only Python files (i.e. with a .py extension)
     $envFiles = Get-ChildItem -Path $environmentsDir -File | Where-Object { $_.Extension -eq ".py" }
@@ -93,7 +93,7 @@ Write-Host ""
 #-----------------------------
 # Step 4: Pick Python files from the Traversal directory in a loop
 #-----------------------------
-$traversalDir = "C:\Users\LocalUser\Desktop\SWARM_Repo\Gautam\AirSimRepo\Traversal"
+$traversalDir = "W:\SWARM\AirSimRepo\Traversal"
 if (Test-Path $traversalDir) {
     while ($true) {
         # Get only Python files (i.e. with a .py extension)
