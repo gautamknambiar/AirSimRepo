@@ -40,7 +40,7 @@ def main():
         print(f"Flying to {gate} at position {position}")
         client.moveToPositionAsync(position.x_val, position.y_val, position.z_val, 7, vehicle_name="drone_1")
         while not inGateSphere(position):
-            time.sleep(0.01)
+            pass
     print("Complete")
 
 main()
