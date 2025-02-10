@@ -39,7 +39,7 @@ def main():
     gate_positions = getGatePositions()
     for gate, position in gate_positions.items():
         print(f"Flying to {gate} at position {position}")
-        client.moveToPositionAsync(position.x_val, position.y_val, position.z_val, 3, vehicle_name="drone_1")
+        client.moveToPositionAsync(position.x_val, position.y_val, position.z_val, 4, vehicle_name="drone_1")
         while not inGateSphere(position):
             pass
     print("Complete")
