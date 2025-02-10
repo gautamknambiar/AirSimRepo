@@ -7,10 +7,10 @@ client = airsimneurips.MultirotorClient()
 def init():
     client.confirmConnection()
     print('Connection confirmed')  # Confirms that connection to the simulation is successful
+    client.simLoadLevel('Soccer_Field_Easy')
     client.enableApiControl(vehicle_name="drone_1")  # Enable API control for the drone
     client.arm(vehicle_name="drone_1")  # Arm the drone so it can take off
-    client.simStartRace() # Start Race
-    start_position = airsimneurips.Vector3r(-4.55, 0.5, 2.0) 
+    start_position = airsimneurips.Vector3r(-4.25, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
@@ -22,7 +22,7 @@ def getGatePositions():
     print(gate_positions)
     return gate_positions
 
-def inGateSphere(position: airsimneurips.Vector3r, radius=4):
+def inGateSphere(position: airsimneurips.Vector3r, radius=3):
     dronePose = client.getMultirotorState(vehicle_name="drone_1").kinematics_estimated.position
 
     dx = dronePose.x_val - position.x_val
