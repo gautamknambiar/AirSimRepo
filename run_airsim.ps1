@@ -1,5 +1,5 @@
 ###############################################################################
-# RunTasks.ps1
+# run_airsim.ps1
 #
 # This script performs the following:
 #
