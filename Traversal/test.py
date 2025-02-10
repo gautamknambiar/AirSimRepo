@@ -60,9 +60,9 @@ def main():
     # Define the time step and instantiate PID controllers for each axis.
     # These PID parameters are starting points and will likely need tuning.
     dt = 0.01  # 10 ms loop time
-    pid_x = PIDController(kp=1.2, ki=0.0, kd=0.3, dt=dt)
-    pid_y = PIDController(kp=1.2, ki=0.0, kd=0.3, dt=dt)
-    pid_z = PIDController(kp=1.2, ki=0.0, kd=0.3, dt=dt)
+    pid_x = PIDController(kp=1.2, ki=0.0, kd=0.1, dt=dt)
+    pid_y = PIDController(kp=1.2, ki=0.0, kd=0.1, dt=dt)
+    pid_z = PIDController(kp=1.2, ki=0.0, kd=0.1, dt=dt)
     
     for gate, target in gate_positions.items():
         print(f"Racing to {gate} at position {target}")
