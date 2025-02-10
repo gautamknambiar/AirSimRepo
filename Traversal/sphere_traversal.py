@@ -6,6 +6,7 @@ client = airsimneurips.MultirotorClient()
 def init():
     client.confirmConnection()
     print('Connection confirmed')  # Confirms that connection to the simulation is successful
+    client.simLoadLevel('Soccer_Field_Easy')
     client.enableApiControl(vehicle_name="drone_1")  # Enable API control for the drone
     client.arm(vehicle_name="drone_1")  # Arm the drone so it can take off
     start_position = airsimneurips.Vector3r(-4.25, -2.0, 1.8)
