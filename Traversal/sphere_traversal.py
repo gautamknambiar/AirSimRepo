@@ -14,12 +14,21 @@ def init():
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
 
+
 def getGatePositions():
-    objects = client.simListSceneObjects() 
-    gates = [obj for obj in objects if 'Gate' in obj] # We only want objects that contain 'Gate' in their names
+    objects = client.simListSceneObjects()
+    gates = [obj for obj in objects if 'Gate' in obj]
     gate_positions = {gate: client.simGetObjectPose(gate).position for gate in gates}
-    print(gate_positions)
-    return gate_positions
+    def extract_gate_number(gate_name):
+        remainder = gate_name.replace("Gate", "")
+        number_str = remainder.split("_")[0]
+        try:
+            return int(number_str)
+        except ValueError:
+            return float('inf')
+    sorted_gate_positions = {gate: gate_positions[gate] for gate in sorted(gate_positions, key=extract_gate_number)}
+    print(sorted_gate_positions)
+    return sorted_gate_positions
 
 def inGateSphere(position: airsimneurips.Vector3r, radius = 3):
     dronePose = client.getMultirotorState(vehicle_name="drone_1").kinematics_estimated.position
