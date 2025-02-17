@@ -183,7 +183,22 @@ class FlightDataCollector:
         ax.set_zlabel('Z')
         ax.set_title("Drone Flight Path with Orientation and Velocity")
         ax.legend()
-        ax.set_box_aspect([1, 1, 1])
+        xlims = ax.get_xlim3d()
+        ylims = ax.get_ylim3d()
+        zlims = ax.get_zlim3d()
+
+        # Compute the midpoints and maximum range among the axes.
+        xmean = np.mean(xlims)
+        ymean = np.mean(ylims)
+        zmean = np.mean(zlims)
+        max_range = np.max([xlims[1] - xlims[0],
+                            ylims[1] - ylims[0],
+                            zlims[1] - zlims[0]])
+
+        # Set all axes to the same limits.
+        ax.set_xlim3d([xmean - max_range / 2, xmean + max_range / 2])
+        ax.set_ylim3d([ymean - max_range / 2, ymean + max_range / 2])
+        ax.set_zlim3d([zmean - max_range / 2, zmean + max_range / 2])
         plt.show()
 
 # ------------------------------------------------------------------------------
