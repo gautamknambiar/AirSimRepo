@@ -199,6 +199,8 @@ class FlightDataCollector:
         ax.set_xlim3d([xmean - max_range / 2, xmean + max_range / 2])
         ax.set_ylim3d([ymean - max_range / 2, ymean + max_range / 2])
         ax.set_zlim3d([zmean - max_range / 2, zmean + max_range / 2])
+        ax.invert_zaxis()
+
         plt.show()
 
 # ------------------------------------------------------------------------------
@@ -244,13 +246,13 @@ def main():
     
     print("Race complete")
 
-    end_position = airsimneurips.Vector3r(25, 10, 20)
+    end_position = airsimneurips.Vector3r(25, 10, -20)
     end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(end_position, end_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
     time.sleep(0.2)
     flight_data_collector.capture(client)
-    end_position = airsimneurips.Vector3r(-3, -2.0, 20)
+    end_position = airsimneurips.Vector3r(-3, -2.0, -20)
     end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(end_position, end_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
