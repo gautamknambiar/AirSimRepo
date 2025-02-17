@@ -243,6 +243,13 @@ def main():
             time.sleep(dt)
     
     print("Race complete")
+
+    end_position = airsimneurips.Vector3r(25, 10, 20)
+    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
+    new_pose = airsimneurips.Pose(end_position, end_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
+    time.sleep(0.5)
+    flight_data_collector.capture(client)
     # Plot the flight path using the FlightDataCollector's method.
     flight_data_collector.plot_flight_path(gate_positions)
 
