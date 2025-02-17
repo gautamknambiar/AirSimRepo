@@ -183,6 +183,7 @@ class FlightDataCollector:
         ax.set_zlabel('Z')
         ax.set_title("Drone Flight Path with Orientation and Velocity")
         ax.legend()
+        ax.set_box_aspect([1, 1, 1])
         plt.show()
 
 # ------------------------------------------------------------------------------
