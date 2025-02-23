@@ -203,6 +203,20 @@ class FlightDataCollector:
 
         plt.show()
 
+def capture_plot_reference(flight_data_collector: FlightDataCollector):
+    end_position = airsimneurips.Vector3r(25, 10, -20)
+    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
+    new_pose = airsimneurips.Pose(end_position, end_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
+    time.sleep(0.2)
+    flight_data_collector.capture(client)
+    end_position = airsimneurips.Vector3r(-3, -2.0, -20)
+    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
+    new_pose = airsimneurips.Pose(end_position, end_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
+    time.sleep(0.2)
+    flight_data_collector.capture(client)
+
 def main():
     init()
     gate_positions = getGatePositions()
@@ -237,20 +251,6 @@ def main():
             time.sleep(dt)
     
     print("Race complete")
-
-    # Clean later (For plot reference)
-    end_position = airsimneurips.Vector3r(25, 10, -20)
-    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
-    new_pose = airsimneurips.Pose(end_position, end_rotation)
-    client.simSetVehiclePose(new_pose, ignore_collison=True)
-    time.sleep(0.2)
-    flight_data_collector.capture(client)
-    end_position = airsimneurips.Vector3r(-3, -2.0, -20)
-    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
-    new_pose = airsimneurips.Pose(end_position, end_rotation)
-    client.simSetVehiclePose(new_pose, ignore_collison=True)
-    time.sleep(0.2)
-    flight_data_collector.capture(client)
 
     flight_data_collector.plot_flight_path(gate_positions)
 
