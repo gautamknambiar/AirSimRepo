@@ -251,7 +251,7 @@ def main():
             time.sleep(dt)
     
     print("Race complete")
-
+    
     capture_plot_reference(flight_data_collector)
     flight_data_collector.plot_flight_path(gate_positions)
 
