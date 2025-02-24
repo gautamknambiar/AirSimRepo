@@ -43,7 +43,7 @@ def getGatePositions():
     print(sorted_gate_positions)
     return sorted_gate_positions
 
-def inGateSphere(position: airsimneurips.Vector3r, radius=3):
+def inGateSphere(position: airsimneurips.Vector3r, radius=2):
     """
     Given a radius and position vector, calculate if the drone is in the gate sphere.
     """
@@ -141,7 +141,7 @@ class FlightDataCollector:
 
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
-        r = 3
+        r = 2
         for gate, pos in gate_positions.items():
             cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
             xsphere = cx + r * np.outer(np.cos(u), np.sin(v))
@@ -242,16 +242,17 @@ def main():
                 current_vel.z_val
             ])
 
-            if np.linalg.norm(current_vel_vector) < 0.1:
-                angle_error = 0
-            else:
-                dot_product = np.dot(current_vel_vector, desired_vel_vector)
-                norm_product = np.linalg.norm(current_vel_vector) * np.linalg.norm(desired_vel_vector)
-                angle_error = math.acos(np.clip(dot_product / norm_product, -1.0, 1.0))
+            # if np.linalg.norm(current_vel_vector) < 0.1:
+            #     angle_error = 0
+            # else:
+            #     dot_product = np.dot(current_vel_vector, desired_vel_vector)
+            #     norm_product = np.linalg.norm(current_vel_vector) * np.linalg.norm(desired_vel_vector)
+            #     angle_error = math.acos(np.clip(dot_product / norm_product, -1.0, 1.0))
             
-            speed_scaling = math.cos(angle_error)
+            # speed_scaling = math.cos(angle_error)
 
-            adjusted_desired_vel = desired_vel_vector * speed_scaling
+            # adjusted_desired_vel = desired_vel_vector * speed_scaling
+            adjusted_desired_vel = desired_vel_vector
 
             vel_error = adjusted_desired_vel - current_vel_vector
             
