@@ -116,26 +116,16 @@ class FlightDataCollector:
         zs = [data['pos'][2] for data in self.flight_data]
         ax.scatter(xs, ys, zs, c='blue', marker='o', label='Flight Path')
         
-        first_ori = True
-        first_vel = True
         for data in self.flight_data:
             x, y, z = data['pos']
-            ori = data['ori']
             vel = data['vel']
-            if first_ori:
-                ax.quiver(x, y, z, ori[0], ori[1], ori[2],
-                          length=1, color=orientation_color, normalize=True, label='Orientation')
-                first_ori = False
-            else:
-                ax.quiver(x, y, z, ori[0], ori[1], ori[2],
-                          length=1, color=orientation_color, normalize=True)
-            if first_vel:
-                ax.quiver(x, y, z, vel[0], vel[1], vel[2],
-                          length=1, color=velocity_color, normalize=True, label='Velocity')
-                first_vel = False
-            else:
-                ax.quiver(x, y, z, vel[0], vel[1], vel[2],
-                          length=1, color=velocity_color, normalize=True)
+            speed = np.linalg.norm(vel)
+            ax.quiver(x, y, z, vel[0], vel[1], vel[2],length=1, color=velocity_color, normalize=True)
+
+            if speed > 0:
+                norm_vel = [v / speed for v in vel]
+                label_pos = [x + norm_vel[i] * 0.5 for i in range(3)]
+                ax.text(label_pos[0], label_pos[1], label_pos[2], f"{speed:.2f} m/s", color=velocity_color, fontsize=8)
 
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
