@@ -203,7 +203,7 @@ def main():
         print(f"Going to {gate} at position {target}")
         pid_x.integral = pid_y.integral = pid_z.integral = 0
         pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
-        print(f'Last gate passed: {client.simGetLastGatePassed(vehicle_name="drone_1")}')
+        # print(f'Last gate passed: {client.simGetLastGatePassed(vehicle_name="drone_1")}') # This function is having some issues
         
         while not inGateSphere(target):
             state = client.getMultirotorState(vehicle_name="drone_1")
