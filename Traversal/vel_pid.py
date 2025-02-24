@@ -123,9 +123,7 @@ class FlightDataCollector:
             ax.quiver(x, y, z, vel[0], vel[1], vel[2],length=1, color=velocity_color, normalize=True)
 
             if speed > 0:
-                norm_vel = [v / speed for v in vel]
-                label_pos = [x + norm_vel[i] * 0.5 for i in range(3)]
-                ax.text(label_pos[0], label_pos[1], label_pos[2], f"{speed:.2f} m/s", color=velocity_color, fontsize=8)
+                ax.text(x, y, z, f"{speed:.2f} m/s", color=velocity_color, fontsize=8)
 
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
