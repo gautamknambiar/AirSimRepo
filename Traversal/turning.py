@@ -27,6 +27,7 @@ def getGatePositions():
     objects = client.simListSceneObjects()
     print(objects)
     gates = [obj for obj in objects if 'Gate' in obj]
+    print(gates)
     gate_positions = {gate: client.simGetObjectPose(gate).position for gate in gates}
 
     def extract_gate_number(gate_name):
