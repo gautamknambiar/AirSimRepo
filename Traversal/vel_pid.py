@@ -20,8 +20,8 @@ def init():
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
     client.simResetRace()
-    client.takeoffAsync()
     client.simStartRace()
+    client.takeoffAsync()
 
 def getGatePositions():
     """
