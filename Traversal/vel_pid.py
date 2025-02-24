@@ -19,7 +19,6 @@ def init():
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
-    client.simStartRace()
 
 def getGatePositions():
     """
@@ -231,7 +230,7 @@ def main():
             else:
                 desired_direction = np.array([0, 0, 0])
             
-            base_speed = 10.0
+            base_speed = 15.0
             desired_vel_vector = base_speed * desired_direction
 
             current_vel_vector = np.array([
