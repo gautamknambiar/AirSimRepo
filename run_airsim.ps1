@@ -24,7 +24,7 @@ if (-not $env:VIRTUAL_ENV) {
     Write-Host ""
     Write-Host "Please activate it by running the following command in your PowerShell session:"
     Write-Host ""
-    Write-Host "W:\SWARM\airsimvenv\Scripts\activate"
+    Write-Host "../airsimvenv/Scripts/activate"
     Write-Host ""
     Write-Host "After activating the virtual environment, please re-run this script."
     exit
