@@ -167,6 +167,7 @@ class FlightDataCollector:
         ax.set_ylim3d([ymean - max_range / 2, ymean + max_range / 2])
         ax.set_zlim3d([zmean - max_range / 2, zmean + max_range / 2])
         ax.invert_zaxis()
+        ax.invert_yaxis()
 
         plt.show()
 
