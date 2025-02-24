@@ -15,6 +15,7 @@ def init():
     client.simLoadLevel('Soccer_Field_Easy')
     client.enableApiControl(vehicle_name="drone_1")
     client.arm(vehicle_name="drone_1")
+    client.simStartRace(1)
     start_position = airsimneurips.Vector3r(-1, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
