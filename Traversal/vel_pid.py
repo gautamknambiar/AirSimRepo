@@ -203,9 +203,9 @@ def main():
     gate_positions = getGatePositions()
 
     dt = 0.01
-    pid_x = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
-    pid_y = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
-    pid_z = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
+    pid_x = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
+    pid_y = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
+    pid_z = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     
     flight_data_collector = FlightDataCollector(capture_interval=0.1, vehicle_name="drone_1")
 
@@ -230,7 +230,7 @@ def main():
             else:
                 desired_direction = np.array([0, 0, 0])
             
-            base_speed = 12.0
+            base_speed = 10.0
             desired_vel_vector = base_speed * desired_direction
 
             current_vel_vector = np.array([
