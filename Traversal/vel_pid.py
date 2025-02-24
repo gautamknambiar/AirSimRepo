@@ -203,9 +203,9 @@ def main():
     gate_positions = getGatePositions()
 
     dt = 0.01
-    pid_x = PIDController(kp=1.2, ki=0.1, kd=0.5, dt=dt)
-    pid_y = PIDController(kp=1.2, ki=0.1, kd=0.5, dt=dt)
-    pid_z = PIDController(kp=1.2, ki=0.1, kd=0.5, dt=dt)
+    pid_x = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
+    pid_y = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
+    pid_z = PIDController(kp=1.2, ki=0.0, kd=0.0, dt=dt)
     
     flight_data_collector = FlightDataCollector(capture_interval=0.1, vehicle_name="drone_1")
 
