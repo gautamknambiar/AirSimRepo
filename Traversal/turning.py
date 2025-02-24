@@ -8,13 +8,13 @@ client = airsimneurips.MultirotorClient()
 
 def init():
     """
-    Connect using API
+    Connect using API.
     """
     client.confirmConnection()
-    print('Connection confirmed')  # Confirms that connection to the simulation is successful
+    print('Connection confirmed')
     client.simLoadLevel('Soccer_Field_Easy')
-    client.enableApiControl(vehicle_name="drone_1")  # Enable API control for the drone
-    client.arm(vehicle_name="drone_1")  # Arm the drone so it can take off
+    client.enableApiControl(vehicle_name="drone_1")
+    client.arm(vehicle_name="drone_1")
     start_position = airsimneurips.Vector3r(-3, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
@@ -22,7 +22,7 @@ def init():
 
 def getGatePositions():
     """
-    Using the Scene objects, grab the gate positions and names
+    Using the Scene objects, grab the gate positions and names.
     """
     objects = client.simListSceneObjects()
     print(objects)
@@ -43,7 +43,7 @@ def getGatePositions():
 
 def inGateSphere(position: airsimneurips.Vector3r, radius=3):
     """
-    Given a radius and position vector, calculate if the drone is in the gate sphere
+    Given a radius and position vector, calculate if the drone is in the gate sphere.
     """
     dronePose = client.getMultirotorState(vehicle_name="drone_1").kinematics_estimated.position
     dx = dronePose.x_val - position.x_val
@@ -57,7 +57,7 @@ def inGateSphere(position: airsimneurips.Vector3r, radius=3):
     else:
         return False
 
-# 1d pid
+# 1d PID
 class PIDController:
     def __init__(self, kp, ki, kd, dt):
         self.kp = kp
@@ -69,7 +69,7 @@ class PIDController:
 
     def update(self, error):
         """
-        Updates PID values and returns an output value for 1d
+        Updates PID values and returns an output value for 1d.
         """
         self.integral += error * self.dt
         derivative = (error - self.previous_error) / self.dt
@@ -77,26 +77,9 @@ class PIDController:
         self.previous_error = error
         return output
 
-def get_forward_vector(q):
-    """
-    Compute the drone's forward unit vector from its orientation quaternion.
-    Assumes the drone's local forward direction is along the +X axis.
-    The quaternion q is assumed to have attributes: x_val, y_val, z_val, w_val.
-    """
-
-    #roll = math.atan2(2*(q.w_val*q.x_val + q.y_val*q.z_val), 1 - 2*(q.x_val**2 + q.y_val**2))
-    pitch = math.asin(max(-1.0, min(1.0, 2*(q.w_val*q.y_val - q.z_val*q.x_val))))
-    yaw = math.atan2(2*(q.w_val*q.z_val + q.x_val*q.y_val), 1 - 2*(q.y_val**2 + q.z_val**2))
-    
-    fx = math.cos(pitch) * math.cos(yaw)
-    fy = math.cos(pitch) * math.sin(yaw)
-    fz = math.sin(pitch)
-    return (fx, fy, fz)
-
 class FlightDataCollector:
     """
     A class to capture and store the drone's flight data at a specified interval.
-    Includes a method to plot the captured flight path.
     """
     def __init__(self, capture_interval=0.1, vehicle_name="drone_1"):
         self.capture_interval = capture_interval
@@ -105,16 +88,13 @@ class FlightDataCollector:
         self.flight_data = []
 
     def capture(self, client):
-        """
-        Captures the current state (position, orientation, velocity) of the drone if the capture
-        interval has passed.
-        """
         current_time = time.time()
         if current_time - self.last_capture_time >= self.capture_interval:
             state = client.getMultirotorState(vehicle_name=self.vehicle_name)
             pos = (state.kinematics_estimated.position.x_val,
                    state.kinematics_estimated.position.y_val,
                    state.kinematics_estimated.position.z_val)
+            # Use the drone's forward vector from its current orientation for plotting.
             q = state.kinematics_estimated.orientation
             ori = get_forward_vector(q)
             vel = (state.kinematics_estimated.linear_velocity.x_val,
@@ -127,20 +107,6 @@ class FlightDataCollector:
         return self.flight_data
 
     def plot_flight_path(self, gate_positions, orientation_color='green', velocity_color='red'):
-        """
-        Create a 3D plot of the flight path using the captured flight data.
-        
-        Parameters:
-          - gate_positions: Dictionary of gate names and their positions.
-          - orientation_color: Color for the orientation arrows.
-          - velocity_color: Color for the velocity arrows.
-          
-        The plot shows:
-          - Drone positions as blue dots.
-          - Orientation vectors (arrows) at each captured point.
-          - Velocity vectors (arrows) at each captured point.
-          - Gate spheres (3 m radius default) as orange wireframes.
-        """
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
@@ -172,7 +138,7 @@ class FlightDataCollector:
 
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
-        r = 3 # Needs to be dynamic?
+        r = 3
         for gate, pos in gate_positions.items():
             cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
             xsphere = cx + r * np.outer(np.cos(u), np.sin(v))
@@ -203,7 +169,20 @@ class FlightDataCollector:
 
         plt.show()
 
+def get_forward_vector(q):
+    """
+    Compute the drone's forward unit vector from its orientation quaternion.
+    Assumes the drone's local forward direction is along the +X axis.
+    """
+    pitch = math.asin(max(-1.0, min(1.0, 2*(q.w_val*q.y_val - q.z_val*q.x_val))))
+    yaw = math.atan2(2*(q.w_val*q.z_val + q.x_val*q.y_val), 1 - 2*(q.y_val**2 + q.z_val**2))
+    fx = math.cos(pitch) * math.cos(yaw)
+    fy = math.cos(pitch) * math.sin(yaw)
+    fz = math.sin(pitch)
+    return (fx, fy, fz)
+
 def capture_plot_reference(flight_data_collector: FlightDataCollector):
+    # These calls to simSetVehiclePose are only for capturing reference states for plotting.
     end_position = airsimneurips.Vector3r(25, 10, -20)
     end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(end_position, end_rotation)
@@ -243,11 +222,14 @@ def main():
             vy = pid_y.update(error_y)
             vz = pid_z.update(error_z)
             
-            client.moveByVelocityAsync(vx, vy, vz, dt, vehicle_name="drone_1")
+            desired_yaw = math.atan2(error_y, error_x)
+            desired_yaw_deg = math.degrees(desired_yaw)
             
-            # Capture the drone state.
+            yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=desired_yaw_deg)
+
+            client.moveByVelocityAsync(vx, vy, vz, dt, yaw_mode=yaw_mode, vehicle_name="drone_1")
+            
             flight_data_collector.capture(client)
-            
             time.sleep(dt)
     
     print("Race complete")
