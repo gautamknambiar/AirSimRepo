@@ -230,7 +230,7 @@ def main():
             else:
                 desired_direction = np.array([0, 0, 0])
             
-            base_speed = 15.0
+            base_speed = 12.0
             desired_vel_vector = base_speed * desired_direction
 
             current_vel_vector = np.array([
