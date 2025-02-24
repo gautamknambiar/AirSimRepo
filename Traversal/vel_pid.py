@@ -19,6 +19,9 @@ def init():
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
+    client.simResetRace()
+    client.takeoffAsync()
+    client.simStartRace()
 
 def getGatePositions():
     """
