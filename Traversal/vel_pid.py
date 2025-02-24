@@ -19,6 +19,7 @@ def init():
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
+    client.simStartRace(1)
 
 def getGatePositions():
     """
@@ -122,7 +123,7 @@ class FlightDataCollector:
             vel = data['vel']
             ori = data['ori']
             speed = np.linalg.norm(vel)
-            
+
             if first_vel:
                 ax.quiver(x, y, z, vel[0], vel[1], vel[2],length=1, color=velocity_color, normalize=True, label='Velocity')
                 first_vel = False
