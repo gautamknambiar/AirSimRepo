@@ -89,7 +89,7 @@ class FlightDataCollector:
         self.last_capture_time = time.time()
         self.flight_data = []
 
-    def capture(self, client):
+    def capture(self, client, control=None):
         current_time = time.time()
         if current_time - self.last_capture_time >= self.capture_interval:
             state = client.getMultirotorState(vehicle_name=self.vehicle_name)
@@ -102,13 +102,13 @@ class FlightDataCollector:
             vel = (state.kinematics_estimated.linear_velocity.x_val,
                    state.kinematics_estimated.linear_velocity.y_val,
                    state.kinematics_estimated.linear_velocity.z_val)
-            self.flight_data.append({'pos': pos, 'ori': ori, 'vel': vel})
+            self.flight_data.append({'pos': pos, 'ori': ori, 'vel': vel, 'control': control})
             self.last_capture_time = current_time
 
     def get_flight_data(self):
         return self.flight_data
 
-    def plot_flight_path(self, gate_positions = None, orientation_color='green', velocity_color='red'):
+    def plot_flight_path(self, gate_positions = None, orientation_color='green', velocity_color='blue', control_color='red'):
         '''
         parameters:
             gate_positions : Dictionary of gate name as key and airsimneurips.Vector3r as value
@@ -122,10 +122,14 @@ class FlightDataCollector:
         ax.scatter(xs, ys, zs, c='blue', marker='o', label='Flight Path')
         first_ori = True
         first_vel = True
+        first_control = True
         for data in self.flight_data:
             x, y, z = data['pos']
             vel = data['vel']
             ori = data['ori']
+            control = None
+            if data['control']:
+                control = data['control']
             speed = np.linalg.norm(vel)
 
             if first_vel:
@@ -139,6 +143,12 @@ class FlightDataCollector:
                 first_ori = False
             else:
                 ax.quiver(x, y, z, ori[0], ori[1], ori[2],length=1, color=orientation_color, normalize=True)
+            
+            if first_control and control:
+                ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True, label='Control')
+                first_ori = False
+            elif control:
+                ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True)
 
             if speed > 0:
                 ax.text(x, y, z, f"{speed:.2f} m/s", color=velocity_color, fontsize=8)
@@ -273,7 +283,7 @@ def main():
             
             client.moveByVelocityAsync(command_vel[0], command_vel[1], command_vel[2], dt, yaw_mode=yaw_mode, vehicle_name="drone_1")
             
-            flight_data_collector.capture(client)
+            flight_data_collector.capture(client, control=command_vel)
             time.sleep(dt)
     
     print("Race complete")
