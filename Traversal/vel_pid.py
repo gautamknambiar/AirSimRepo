@@ -257,17 +257,17 @@ def main():
                 current_vel.z_val
             ])
 
-            # if np.linalg.norm(current_vel_vector) < 0.1:
-            #     angle_error = 0
-            # else:
-            #     dot_product = np.dot(current_vel_vector, desired_vel_vector)
-            #     norm_product = np.linalg.norm(current_vel_vector) * np.linalg.norm(desired_vel_vector)
-            #     angle_error = math.acos(np.clip(dot_product / norm_product, -1.0, 1.0))
+            if np.linalg.norm(current_vel_vector) < 0.1:
+                angle_error = 0
+            else:
+                dot_product = np.dot(current_vel_vector, desired_vel_vector)
+                norm_product = np.linalg.norm(current_vel_vector) * np.linalg.norm(desired_vel_vector)
+                angle_error = math.acos(np.clip(dot_product / norm_product, -1.0, 1.0))
             
-            # speed_scaling = math.cos(angle_error)
+            speed_scaling = math.cos(angle_error)
 
-            # adjusted_desired_vel = desired_vel_vector * speed_scaling
-            adjusted_desired_vel = desired_vel_vector
+            adjusted_desired_vel = desired_vel_vector * speed_scaling
+            # adjusted_desired_vel = desired_vel_vector
 
             vel_error = adjusted_desired_vel - current_vel_vector
             
