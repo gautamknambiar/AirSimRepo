@@ -127,9 +127,7 @@ class FlightDataCollector:
             x, y, z = data['pos']
             vel = data['vel']
             ori = data['ori']
-            control = None
-            if data['control'] is not None:
-                control = data['control']
+            control = data['control']
             speed = np.linalg.norm(vel)
 
             if first_vel:
