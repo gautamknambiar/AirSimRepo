@@ -146,7 +146,7 @@ class FlightDataCollector:
             
             if first_control and control is not None:
                 ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True, label='Control')
-                first_ori = False
+                first_control = False
             elif control is not None:
                 ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True)
 
