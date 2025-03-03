@@ -223,7 +223,7 @@ def main():
     pid_y = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     pid_z = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     
-    flight_data_collector = FlightDataCollector(capture_interval=0.1, vehicle_name="drone_1")
+    flight_data_collector = FlightDataCollector(capture_interval=0.05, vehicle_name="drone_1")
     
     # --- Performance Metrics Variables ---
     race_start_time = None
@@ -298,6 +298,9 @@ def main():
             race_end_time = time.time()
 
     print("Race complete")
+    for i in range(10):
+        flight_data_collector.capture(client, control=command_vel)
+        time.sleep(dt)
     
     # --- Compute Performance Metrics ---
     if race_start_time is not None and race_end_time is not None:
