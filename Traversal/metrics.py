@@ -83,16 +83,17 @@ class FlightDataCollector:
     """
     A class to capture and store the drone's flight data at a specified interval.
     """
-    def __init__(self, capture_interval=0.1, vehicle_name="drone_1"):
+    def __init__(self, client: airsimneurips.MultirotorClient, capture_interval=0.1, vehicle_name="drone_1"):
         self.capture_interval = capture_interval
+        self.client = client
         self.vehicle_name = vehicle_name
         self.last_capture_time = time.time()
         self.flight_data = []
 
-    def capture(self, client, control=None):
+    def capture(self, control=None):
         current_time = time.time()
         if current_time - self.last_capture_time >= self.capture_interval:
-            state = client.getMultirotorState(vehicle_name=self.vehicle_name)
+            state = self.client.getMultirotorState(vehicle_name=self.vehicle_name)
             pos = (state.kinematics_estimated.position.x_val,
                    state.kinematics_estimated.position.y_val,
                    state.kinematics_estimated.position.z_val)
@@ -206,13 +207,13 @@ def capture_plot_reference(flight_data_collector: FlightDataCollector):
     new_pose = airsimneurips.Pose(end_position, end_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
     time.sleep(0.2)
-    flight_data_collector.capture(client)
+    flight_data_collector.capture()
     end_position = airsimneurips.Vector3r(-3, -2.0, -20)
     end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(end_position, end_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
     time.sleep(0.2)
-    flight_data_collector.capture(client)
+    flight_data_collector.capture()
 
 def main():
     init()
@@ -223,7 +224,7 @@ def main():
     pid_y = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     pid_z = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     
-    flight_data_collector = FlightDataCollector(capture_interval=0.05, vehicle_name="drone_1")
+    flight_data_collector = FlightDataCollector(client=client, capture_interval=0.05, vehicle_name="drone_1")
     
     # --- Performance Metrics Variables ---
     race_start_time = None
@@ -255,7 +256,7 @@ def main():
             else:
                 desired_direction = np.array([0, 0, 0])
             
-            base_speed = 11.0
+            base_speed = 10.0
             desired_vel_vector = base_speed * desired_direction
 
             current_vel_vector = np.array([
@@ -287,7 +288,7 @@ def main():
             client.moveByVelocityAsync(command_vel[0], command_vel[1], command_vel[2],
                                        dt, yaw_mode=yaw_mode, vehicle_name="drone_1")
             
-            flight_data_collector.capture(client, control=command_vel)
+            flight_data_collector.capture(control=command_vel)
             time.sleep(dt)
 
         # If this is the first gate, record the race start time
@@ -299,7 +300,7 @@ def main():
 
     print("Race complete")
     for i in range(50):
-        flight_data_collector.capture(client, control=command_vel)
+        flight_data_collector.capture(control=command_vel)
         time.sleep(dt)
     
     # --- Compute Performance Metrics ---
