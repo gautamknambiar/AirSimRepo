@@ -43,7 +43,7 @@ def getGatePositions():
     print(sorted_gate_positions)
     return sorted_gate_positions
 
-def inGateSphere(position: airsimneurips.Vector3r, radius=2):
+def inGateSphere(position: airsimneurips.Vector3r, radius=1.5):
     """
     Given a radius and position vector, calculate if the drone is in the gate sphere.
     """
@@ -154,7 +154,7 @@ class FlightDataCollector:
 
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
-        r = 2
+        r = 1.5
         if gate_positions:
             for gate, pos in gate_positions.items():
                 cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
