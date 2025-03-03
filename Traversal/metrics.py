@@ -298,7 +298,7 @@ def main():
             race_end_time = time.time()
 
     print("Race complete")
-    for i in range(10):
+    for i in range(50):
         flight_data_collector.capture(client, control=command_vel)
         time.sleep(dt)
     
