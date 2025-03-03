@@ -128,7 +128,7 @@ class FlightDataCollector:
             vel = data['vel']
             ori = data['ori']
             control = None
-            if data['control'][0] and data['control'][1] and data['control'][2]:
+            if data['control'] is not None:
                 control = data['control']
             speed = np.linalg.norm(vel)
 
@@ -144,10 +144,10 @@ class FlightDataCollector:
             else:
                 ax.quiver(x, y, z, ori[0], ori[1], ori[2],length=1, color=orientation_color, normalize=True)
             
-            if first_control and control:
+            if first_control and control is not None:
                 ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True, label='Control')
                 first_ori = False
-            elif control:
+            elif control is not None:
                 ax.quiver(x, y, z, control[0], control[1], control[2],length=1, color=control_color, normalize=True)
 
             if speed > 0:
