@@ -108,9 +108,9 @@ class FlightDataCollector:
     def get_flight_data(self):
         return self.flight_data
 
-    def plot_flight_path(self, gate_positions = None, orientation_color='green', velocity_color='blue', control_color='red'):
+    def plot_flight_path(self, gate_positions=None, orientation_color='green', velocity_color='blue', control_color='red'):
         '''
-        parameters:
+        Parameters:
             gate_positions : Dictionary of gate name as key and airsimneurips.Vector3r as value
         '''
         fig = plt.figure()
@@ -142,11 +142,12 @@ class FlightDataCollector:
             else:
                 ax.quiver(x, y, z, ori[0], ori[1], ori[2], length=1, color=orientation_color, normalize=True)
             
-            if first_control and control is not None:
-                ax.quiver(x, y, z, control[0], control[1], control[2], length=1, color=control_color, normalize=True, label='Control')
-                first_control = False
-            elif control is not None:
-                ax.quiver(x, y, z, control[0], control[1], control[2], length=1, color=control_color, normalize=True)
+            if control is not None:
+                if first_control:
+                    ax.quiver(x, y, z, control[0], control[1], control[2], length=1, color=control_color, normalize=True, label='Control')
+                    first_control = False
+                else:
+                    ax.quiver(x, y, z, control[0], control[1], control[2], length=1, color=control_color, normalize=True)
 
             if speed > 0:
                 ax.text(x, y, z, f"{speed:.2f} m/s", color=velocity_color, fontsize=8)
@@ -225,7 +226,6 @@ def main():
     flight_data_collector = FlightDataCollector(capture_interval=0.1, vehicle_name="drone_1")
     
     # --- Performance Metrics Variables ---
-    gate_min_distances = []
     race_start_time = None
     race_end_time = None
 
@@ -237,7 +237,7 @@ def main():
         pid_x.integral = pid_y.integral = pid_z.integral = 0
         pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
         
-        gate_min_distance = float('inf')
+        
         while not inGateSphere(target):
             state = client.getMultirotorState(vehicle_name="drone_1")
             current_pos = state.kinematics_estimated.position
@@ -249,8 +249,6 @@ def main():
                 target.z_val - current_pos.z_val
             ])
             distance = np.linalg.norm(error_vector)
-            if distance < gate_min_distance:
-                gate_min_distance = distance
             
             if distance > 0:
                 desired_direction = error_vector / distance
@@ -291,14 +289,11 @@ def main():
             
             flight_data_collector.capture(client, control=command_vel)
             time.sleep(dt)
-        
-        # Gate reached, record minimum distance for this gate
-        gate_min_distances.append(gate_min_distance)
-        print(f"Minimum distance for {gate}: {gate_min_distance:.2f} meters")
-        
-        # Record race start time at first gate and race end time at last gate
+
+        # If this is the first gate, record the race start time
         if idx == 0:
             race_start_time = time.time()
+        # If this is the last gate, record the race end time
         if idx == total_gates - 1:
             race_end_time = time.time()
 
@@ -326,7 +321,22 @@ def main():
     else:
         print("No velocity data recorded between first and last gate.")
     
-    # Average minimum distance to each gate
+    # --- Compute Average Minimum Distance to Each Gate (Post Race) ---
+    gate_min_distances = []
+    for gate, pos in gate_positions.items():
+        min_distance = float('inf')
+        # For each flight data position, compute the distance to the gate position.
+        for data in flight_entries:
+            flight_pos = data['pos']
+            dx = flight_pos[0] - pos.x_val
+            dy = flight_pos[1] - pos.y_val
+            dz = flight_pos[2] - pos.z_val
+            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if distance < min_distance:
+                min_distance = distance
+        gate_min_distances.append(min_distance)
+        print(f"Minimum distance to {gate}: {min_distance:.2f} meters")
+    
     if gate_min_distances:
         avg_min_distance = sum(gate_min_distances) / len(gate_min_distances)
         print(f"Average minimum distance to each gate: {avg_min_distance:.2f} meters")
