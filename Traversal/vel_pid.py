@@ -15,13 +15,11 @@ def init():
     client.simLoadLevel('Soccer_Field_Easy')
     client.enableApiControl(vehicle_name="drone_1")
     client.arm(vehicle_name="drone_1")
-    client.simStartRace(1)
-    time.sleep(2)
+    time.sleep(1)
     start_position = airsimneurips.Vector3r(-1, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
-    client.simStartRace(1)
 
 def getGatePositions():
     """
@@ -110,7 +108,11 @@ class FlightDataCollector:
     def get_flight_data(self):
         return self.flight_data
 
-    def plot_flight_path(self, gate_positions, orientation_color='green', velocity_color='red'):
+    def plot_flight_path(self, gate_positions = None, orientation_color='green', velocity_color='red'):
+        '''
+        parameters:
+            gate_positions : Dictionary of gate name as key and airsimneurips.Vector3r as value
+        '''
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
@@ -144,12 +146,13 @@ class FlightDataCollector:
         u = np.linspace(0, 2 * np.pi, 20)
         v = np.linspace(0, np.pi, 20)
         r = 2
-        for gate, pos in gate_positions.items():
-            cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
-            xsphere = cx + r * np.outer(np.cos(u), np.sin(v))
-            ysphere = cy + r * np.outer(np.sin(u), np.sin(v))
-            zsphere = cz + r * np.outer(np.ones_like(u), np.cos(v))
-            ax.plot_wireframe(xsphere, ysphere, zsphere, color='orange', alpha=0.3)
+        if gate_positions:
+            for gate, pos in gate_positions.items():
+                cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
+                xsphere = cx + r * np.outer(np.cos(u), np.sin(v))
+                ysphere = cy + r * np.outer(np.sin(u), np.sin(v))
+                zsphere = cz + r * np.outer(np.ones_like(u), np.cos(v))
+                ax.plot_wireframe(xsphere, ysphere, zsphere, color='orange', alpha=0.3)
         
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
@@ -277,7 +280,7 @@ def main():
     time.sleep(1)
     
     capture_plot_reference(flight_data_collector)
-    flight_data_collector.plot_flight_path(gate_positions)
+    flight_data_collector.plot_flight_path(gate_positions=gate_positions)
 
 if __name__ == "__main__":
     main()
