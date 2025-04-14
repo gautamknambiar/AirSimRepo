@@ -295,7 +295,7 @@ def main():
             # Compute the base yaw using the desired direction (XY plane)
             base_yaw = math.atan2(desired_direction[1], desired_direction[0])
             # Apply overcorrection: Adjust the yaw angle based on the angle error and its sign.
-            overcorrection_gain = 1.5  # Tune this gain to increase or decrease overcorrection
+            overcorrection_gain = 3  # Tune this gain to increase or decrease overcorrection
             adjusted_yaw = base_yaw + overcorrection_gain * angle_error * angle_sign
             desired_yaw_deg = math.degrees(adjusted_yaw)
             
