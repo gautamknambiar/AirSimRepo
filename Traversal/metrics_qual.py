@@ -261,7 +261,7 @@ def main():
             else:
                 desired_direction = np.array([0, 0, 0])
             
-            base_speed = 10.0
+            base_speed = 8.0
             desired_vel_vector = base_speed * desired_direction
 
             current_vel_vector = np.array([
@@ -295,7 +295,7 @@ def main():
             # Compute the base yaw using the desired direction (XY plane)
             base_yaw = math.atan2(desired_direction[1], desired_direction[0])
             # Apply overcorrection: Adjust the yaw angle based on the angle error and its sign.
-            overcorrection_gain = 3  # Tune this gain to increase or decrease overcorrection
+            overcorrection_gain = 1.0  # Tune this gain to increase or decrease overcorrection
             adjusted_yaw = base_yaw + overcorrection_gain * angle_error * angle_sign
             desired_yaw_deg = math.degrees(adjusted_yaw)
             
