@@ -243,12 +243,12 @@ def main():
         pid_x.integral = pid_y.integral = pid_z.integral = 0
         pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
         
-        
         while not inGateSphere(target):
             state = client.getMultirotorState(vehicle_name="drone_1")
             current_pos = state.kinematics_estimated.position
             current_vel = state.kinematics_estimated.linear_velocity
 
+            # Compute error vector and normalize to get the desired direction
             error_vector = np.array([
                 target.x_val - current_pos.x_val,
                 target.y_val - current_pos.y_val,
@@ -270,13 +270,19 @@ def main():
                 current_vel.z_val
             ])
 
+            # Calculate the angle error between current and desired velocities.
+            # Also determine the sign (direction) of the needed correction using the 2D cross product (XY plane).
             if np.linalg.norm(current_vel_vector) < 0.1:
                 angle_error = 0
+                angle_sign = 0  # No meaningful angular direction when nearly stationary
             else:
                 dot_product = np.dot(current_vel_vector, desired_vel_vector)
                 norm_product = np.linalg.norm(current_vel_vector) * np.linalg.norm(desired_vel_vector)
                 angle_error = math.acos(np.clip(dot_product / norm_product, -1.0, 1.0))
+                # For the sign: a positive value means the desired vector is to the left of current vector
+                angle_sign = np.sign(current_vel_vector[0] * desired_vel_vector[1] - current_vel_vector[1] * desired_vel_vector[0])
             
+            # Use the cosine of the angle error to scale the desired velocity vector
             speed_scaling = math.cos(angle_error)
             adjusted_desired_vel = desired_vel_vector * speed_scaling
             vel_error = adjusted_desired_vel - current_vel_vector
@@ -286,8 +292,13 @@ def main():
             control_z = pid_z.update(vel_error[2])
             command_vel = current_vel_vector + np.array([control_x, control_y, control_z])
             
-            desired_yaw = math.atan2(desired_direction[1], desired_direction[0])
-            desired_yaw_deg = math.degrees(desired_yaw)
+            # Compute the base yaw using the desired direction (XY plane)
+            base_yaw = math.atan2(desired_direction[1], desired_direction[0])
+            # Apply overcorrection: Adjust the yaw angle based on the angle error and its sign.
+            overcorrection_gain = 1.0  # Tune this gain to increase or decrease overcorrection
+            adjusted_yaw = base_yaw + overcorrection_gain * angle_error * angle_sign
+            desired_yaw_deg = math.degrees(adjusted_yaw)
+            
             yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=desired_yaw_deg)
             
             client.moveByVelocityAsync(command_vel[0], command_vel[1], command_vel[2],
@@ -296,10 +307,9 @@ def main():
             flight_data_collector.capture(control=command_vel)
             time.sleep(dt)
 
-        # If this is the first gate, record the race start time
+        # Record the race start and end times at the appropriate gates
         if idx == 0:
             race_start_time = time.time()
-        # If this is the last gate, record the race end time
         if idx == total_gates - 1:
             race_end_time = time.time()
 
