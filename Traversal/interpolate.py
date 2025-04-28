@@ -245,129 +245,150 @@ def capture_plot_reference(flight_data_collector: FlightDataCollector):
     time.sleep(0.2)
     flight_data_collector.capture()
 
+def finalize(flight_data_collector, gate_positions, spline_waypoints, race_start_time, race_end_time, dt):
+    """
+    Run all post-race data capture, metrics, and plotting.
+    Safe to call even if race_end_time is None (e.g. on interrupt).
+    """
+    # extra capture after loop (matches your original 50-step capture)
+    for _ in range(50):
+        flight_data_collector.capture()
+        time.sleep(dt)
+
+    # --- Compute Performance Metrics ---
+    entries = flight_data_collector.get_flight_data()
+
+    # Race time
+    if race_start_time is not None and race_end_time is not None:
+        total_time = race_end_time - race_start_time
+        print(f"Race completion time (first gate to last gate): {total_time:.2f} seconds")
+    else:
+        print("Race timing not recorded properly.")
+
+    # Average velocity between first & last gate
+    speeds = []
+    if race_start_time is not None and race_end_time is not None:
+        for e in entries:
+            t = e['time']
+            if race_start_time <= t <= race_end_time:
+                v = e['vel']
+                speeds.append(np.linalg.norm(v))
+    if speeds:
+        print(f"Average velocity between first and last gate: {sum(speeds)/len(speeds):.2f} m/s")
+    else:
+        print("No velocity data recorded between first and last gate.")
+
+    # Average minimum distance to each gate
+    gate_distances = []
+    for gate, pos in gate_positions.items():
+        min_d = float('inf')
+        for e in entries:
+            fp = e['pos']
+            dx, dy, dz = fp[0]-pos.x_val, fp[1]-pos.y_val, fp[2]-pos.z_val
+            d = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if d < min_d:
+                min_d = d
+        gate_distances.append(min_d)
+        print(f"Minimum distance to {gate}: {min_d:.2f} meters")
+    if gate_distances:
+        print(f"Average minimum distance to each gate: {sum(gate_distances)/len(gate_distances):.2f} meters")
+    else:
+        print("No gate distance data recorded.")
+
+    # small pause, then plotting
+    time.sleep(1)
+    capture_plot_reference(flight_data_collector)
+    flight_data_collector.plot_flight_path(
+        gate_positions=gate_positions,
+        waypoint_positions=spline_waypoints
+    )
+
 def main():
     init()
     gate_positions = getGatePositions()
-    # create spline waypoints (10 points between each gate)
     spline_waypoints = generate_spline_waypoints(gate_positions, points_per_segment=10)
 
     dt = 0.01
     pid_x = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     pid_y = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
     pid_z = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
-    
-    flight_data_collector = FlightDataCollector(client=client, capture_interval=0.05, vehicle_name="drone_1")
-    
-    # --- Performance Metrics Variables ---
+
+    flight_data_collector = FlightDataCollector(
+        client=client, capture_interval=0.05, vehicle_name="drone_1"
+    )
+
     race_start_time = None
     race_end_time = None
-
     total_waypoints = len(spline_waypoints)
 
-    for idx, target in enumerate(spline_waypoints):
-        print(f"Going to waypoint {idx+1}/{total_waypoints} at position {target}")
-        pid_x.integral = pid_y.integral = pid_z.integral = 0
-        pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
-        
-        # smaller radius for waypoint convergence
-        while not inGateSphere(target, radius=0.5):
-            state = client.getMultirotorState(vehicle_name="drone_1")
-            current_pos = state.kinematics_estimated.position
-            current_vel = state.kinematics_estimated.linear_velocity
+    try:
+        for idx, target in enumerate(spline_waypoints):
+            print(f"Going to waypoint {idx+1}/{total_waypoints} at position {target}")
+            pid_x.integral = pid_y.integral = pid_z.integral = 0
+            pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
 
-            error_vector = np.array([
-                target.x_val - current_pos.x_val,
-                target.y_val - current_pos.y_val,
-                target.z_val - current_pos.z_val
-            ])
-            distance = np.linalg.norm(error_vector)
-            desired_direction = (error_vector / distance) if distance > 0 else np.zeros(3)
+            while not inGateSphere(target, radius=0.5):
+                state = client.getMultirotorState(vehicle_name="drone_1")
+                pos = state.kinematics_estimated.position
+                vel = state.kinematics_estimated.linear_velocity
 
-            base_speed = 10.0
-            desired_vel_vector = base_speed * desired_direction
-            current_vel_vector = np.array([
-                current_vel.x_val,
-                current_vel.y_val,
-                current_vel.z_val
-            ])
+                err_vec = np.array([
+                    target.x_val - pos.x_val,
+                    target.y_val - pos.y_val,
+                    target.z_val - pos.z_val
+                ])
+                dist = np.linalg.norm(err_vec)
+                direction = (err_vec / dist) if dist > 0 else np.zeros(3)
 
-            vel_error = desired_vel_vector - current_vel_vector
-            
-            control_x = pid_x.update(vel_error[0])
-            control_y = pid_y.update(vel_error[1])
-            control_z = pid_z.update(vel_error[2])
-            command_vel = current_vel_vector + np.array([control_x, control_y, control_z])
-            
-            desired_yaw = math.degrees(math.atan2(desired_direction[1], desired_direction[0]))
-            yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=desired_yaw)
-            
-            client.moveByVelocityAsync(
-                command_vel[0], command_vel[1], command_vel[2],
-                dt, yaw_mode=yaw_mode, vehicle_name="drone_1"
-            )
-            
-            flight_data_collector.capture(control=command_vel)
-            time.sleep(dt)
+                base_speed = 10.0
+                desired_vel = base_speed * direction
+                curr_vel = np.array([vel.x_val, vel.y_val, vel.z_val])
+                vel_err = desired_vel - curr_vel
 
-        if idx == 0:
-            race_start_time = time.time()
-        if idx == total_waypoints - 1:
+                cx = pid_x.update(vel_err[0])
+                cy = pid_y.update(vel_err[1])
+                cz = pid_z.update(vel_err[2])
+                command_vel = curr_vel + np.array([cx, cy, cz])
+
+                yaw_deg = math.degrees(math.atan2(direction[1], direction[0]))
+                yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=yaw_deg)
+
+                client.moveByVelocityAsync(
+                    command_vel[0], command_vel[1], command_vel[2],
+                    dt, yaw_mode=yaw_mode, vehicle_name="drone_1"
+                )
+
+                flight_data_collector.capture(control=command_vel)
+                time.sleep(dt)
+
+            if idx == 0:
+                race_start_time = time.time()
+            if idx == total_waypoints - 1:
+                race_end_time = time.time()
+
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt received. Finalizing with data collected so far...")
+        if race_start_time and not race_end_time:
             race_end_time = time.time()
+        finalize(
+            flight_data_collector,
+            gate_positions,
+            spline_waypoints,
+            race_start_time,
+            race_end_time,
+            dt
+        )
+        return
 
+    # normal completion
     print("Race complete")
-    for _ in range(50):
-        flight_data_collector.capture(control=command_vel)
-        time.sleep(dt)
-    
-    # --- Compute Performance Metrics ---
-    if race_start_time is not None and race_end_time is not None:
-        race_time = race_end_time - race_start_time
-        print(f"Race completion time (first gate to last gate): {race_time:.2f} seconds")
-    else:
-        print("Race timing not recorded properly.")
-    
-    # Average velocity (using captured flight data between race start and end)
-    flight_entries = flight_data_collector.get_flight_data()
-    speeds = []
-    for entry in flight_entries:
-        t = entry['time']
-        if race_start_time <= t <= race_end_time:
-            vel = entry['vel']
-            speed = np.linalg.norm(vel)
-            speeds.append(speed)
-    if speeds:
-        avg_velocity = sum(speeds) / len(speeds)
-        print(f"Average velocity between first and last gate: {avg_velocity:.2f} m/s")
-    else:
-        print("No velocity data recorded between first and last gate.")
-    
-    # --- Compute Average Minimum Distance to Each Gate (Post Race) ---
-    gate_min_distances = []
-    for gate, pos in gate_positions.items():
-        min_distance = float('inf')
-        # For each flight data position, compute the distance to the gate position.
-        for data in flight_entries:
-            flight_pos = data['pos']
-            dx = flight_pos[0] - pos.x_val
-            dy = flight_pos[1] - pos.y_val
-            dz = flight_pos[2] - pos.z_val
-            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
-            if distance < min_distance:
-                min_distance = distance
-        gate_min_distances.append(min_distance)
-        print(f"Minimum distance to {gate}: {min_distance:.2f} meters")
-    
-    if gate_min_distances:
-        avg_min_distance = sum(gate_min_distances) / len(gate_min_distances)
-        print(f"Average minimum distance to each gate: {avg_min_distance:.2f} meters")
-    else:
-        print("No gate distance data recorded.")
-
-    time.sleep(1)
-    capture_plot_reference(flight_data_collector)
-    flight_data_collector.plot_flight_path(
-        gate_positions=gate_positions,
-        waypoint_positions=spline_waypoints
+    finalize(
+        flight_data_collector,
+        gate_positions,
+        spline_waypoints,
+        race_start_time,
+        race_end_time,
+        dt
     )
 
 if __name__ == "__main__":
