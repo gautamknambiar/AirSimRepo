@@ -190,9 +190,9 @@ def main():
 
     # PID setup (unchanged) …
     dt = 0.01
-    pid_x = PIDController(1.2, 0.1, 0.1, dt)
-    pid_y = PIDController(1.2, 0.1, 0.1, dt)
-    pid_z = PIDController(1.2, 0.1, 0.1, dt)
+    pid_x = PIDController(1.2, 0.1, 0.3, dt)
+    pid_y = PIDController(1.2, 0.1, 0.3, dt)
+    pid_z = PIDController(1.2, 0.1, 0.3, dt)
     pid_x.integral = pid_y.integral = pid_z.integral = 0
     pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
 
