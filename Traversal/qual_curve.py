@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D              # new: enables 3D plotting 
 client = airsimneurips.MultirotorClient()
 
 MAX_SPEED = 10.0   # m/s when perfectly straight
-MIN_SPEED =  3.0   # m/s when very sharp turn
+MIN_SPEED =  0.0   # m/s when very sharp turn
 CURVATURE_CAP = math.pi  # maximum possible average turn (~180° per segment)
 
 def init():
@@ -234,7 +234,7 @@ def get_forward_vector(q):
     fz = math.sin(pitch)
     return (fx, fy, fz)
 
-def compute_curvature(waypoints, idx, lookahead=5):
+def compute_curvature(waypoints, idx, lookahead=8):
     """
     Returns the average turning angle (radians) between the next `lookahead` segments
     starting at waypoint index `idx`.
