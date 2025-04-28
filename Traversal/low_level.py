@@ -15,6 +15,7 @@ def init():
     client.simLoadLevel('Soccer_Field_Easy')
     client.enableApiControl(vehicle_name="drone_1")
     client.arm(vehicle_name="drone_1")
+    client.takeoffAsync(vehicle_name="drone_1").join()
     time.sleep(1)
     start_position = airsimneurips.Vector3r(-1, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
@@ -287,7 +288,13 @@ def main():
             pitch_rate = control_x
             roll_rate  = -control_y
             yaw_rate   = 0.0
-            throttle   = float(np.clip(0.5 + control_z, 0.0, 1.0))
+            
+            hover_throttle = 0.6                  # empirically tune this: ~0.5–0.7
+            z_scale      = 0.05                   # scale down your PID output
+            throttle     = float(np.clip(
+                                hover_throttle + z_scale * control_z,
+                                0.0, 1.0
+                            ))
 
             client.moveByAngleRatesThrottleAsync(
                 roll_rate, pitch_rate, yaw_rate,
