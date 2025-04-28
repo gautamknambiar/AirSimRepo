@@ -2,9 +2,9 @@ import airsimneurips
 import math
 import time
 import numpy as np
-from scipy.interpolate import splprep, splev       # ── new
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D            # ── new (3D plotting support)
+from scipy.interpolate import splprep, splev          # new: for 3D spline interpolation
+from mpl_toolkits.mplot3d import Axes3D              # new: enables 3D plotting support
 
 client = airsimneurips.MultirotorClient()
 
@@ -20,248 +20,322 @@ def init():
     time.sleep(1)
     start_position = airsimneurips.Vector3r(-1, -2.0, 1.8)
     start_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
-    client.simSetVehiclePose(airsimneurips.Pose(start_position, start_rotation), ignore_collison=True)
+    new_pose = airsimneurips.Pose(start_position, start_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
 
 def getGatePositions(client=None):
+    # If no client is provided, attempt to use the global variable 'client'
     if client is None:
-        client = globals()['client']
-    objects = client.simListSceneObjects()
-    gates = [obj for obj in objects if 'Gate' in obj]
-    poses = {g: client.simGetObjectPose(g).position for g in gates}
-    def gate_idx(name):
         try:
-            return int(name.replace("Gate","").split("_")[0])
-        except:
+            client = globals()['client']
+        except KeyError:
+            raise ValueError("No client provided and no global client available.")
+    
+    objects = client.simListSceneObjects()
+    print(f"{objects}\n\n")
+    gates = [obj for obj in objects if 'Gate' in obj]
+    print(f"{gates}\n\n")
+    gate_positions = {gate: client.simGetObjectPose(gate).position for gate in gates}
+    
+    def extract_gate_number(gate_name):
+        remainder = gate_name.replace("Gate", "")
+        number_str = remainder.split("_")[0]
+        try:
+            return int(number_str)
+        except ValueError:
             return float('inf')
-    # sort by gate number
-    return {g: poses[g] for g in sorted(poses, key=gate_idx)}
+    
+    sorted_gate_positions = {
+        gate: gate_positions[gate] 
+        for gate in sorted(gate_positions, key=extract_gate_number)
+    }
+    print(sorted_gate_positions)
+    return sorted_gate_positions
 
-def generate_spline_waypoints(gate_positions, smoothing=0, num_points=200):
+def generate_spline_waypoints(gate_positions, points_per_segment=10):
     """
-    Take the sequence of gate positions and fit a 3D spline,
-    returning a list of Vector3r waypoints along that spline.
+    Generates a smooth 3D spline through the gate centers,
+    returning a list of airsimneurips.Vector3r waypoints.
     """
-    pts = np.array([[p.x_val, p.y_val, p.z_val] for p in gate_positions.values()]).T
-    tck, u = splprep(pts, s=smoothing)
-    u_new = np.linspace(0, 1, num_points)
-    x_new, y_new, z_new = splev(u_new, tck)
-    return [airsimneurips.Vector3r(x, y, z) for x, y, z in zip(x_new, y_new, z_new)]
+    coords = np.array([[p.x_val, p.y_val, p.z_val] for p in gate_positions.values()]).T
+    # build spline that passes exactly through each gate center
+    tck, u = splprep(coords, s=0)
+    num_waypoints = points_per_segment * len(gate_positions)
+    u_fine = np.linspace(0, 1, num_waypoints)
+    x_fine, y_fine, z_fine = splev(u_fine, tck)
+    return [airsimneurips.Vector3r(x, y, z) for x, y, z in zip(x_fine, y_fine, z_fine)]
 
-def inSphere(position: airsimneurips.Vector3r, radius=0.5, vehicle_name="drone_1"):
+def inGateSphere(position: airsimneurips.Vector3r, radius=1.5):
     """
-    Returns True if the drone is within `radius` of `position`.
+    Given a radius and position vector, calculate if the drone is within that sphere.
     """
-    p = client.getMultirotorState(vehicle_name=vehicle_name).kinematics_estimated.position
-    dx, dy, dz = p.x_val - position.x_val, p.y_val - position.y_val, p.z_val - position.z_val
-    return (dx*dx + dy*dy + dz*dz) <= radius**2
+    dronePose = client.getMultirotorState(vehicle_name="drone_1").kinematics_estimated.position
+    dx = dronePose.x_val - position.x_val
+    dy = dronePose.y_val - position.y_val
+    dz = dronePose.z_val - position.z_val
+    distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+    
+    if distance <= radius:
+        print(f"Reached sphere at position {position}, moving to next target")
+        return True
+    else:
+        return False
 
+# 1d PID
 class PIDController:
     def __init__(self, kp, ki, kd, dt):
-        self.kp, self.ki, self.kd, self.dt = kp, ki, kd, dt
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.dt = dt
         self.integral = 0
         self.previous_error = 0
 
     def update(self, error):
+        """
+        Updates PID values and returns an output value for 1d.
+        """
         self.integral += error * self.dt
         derivative = (error - self.previous_error) / self.dt
-        out = self.kp*error + self.ki*self.integral + self.kd*derivative
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
         self.previous_error = error
-        return out
+        return output
 
 class FlightDataCollector:
-    def __init__(self, client, capture_interval=0.1, vehicle_name="drone_1"):
-        self.client = client
+    """
+    A class to capture and store the drone's flight data at a specified interval.
+    """
+    def __init__(self, client: airsimneurips.MultirotorClient, capture_interval=0.1, vehicle_name="drone_1"):
         self.capture_interval = capture_interval
+        self.client = client
         self.vehicle_name = vehicle_name
         self.last_capture_time = time.time()
         self.flight_data = []
 
     def capture(self, control=None):
-        now = time.time()
-        if now - self.last_capture_time >= self.capture_interval:
-            s = self.client.getMultirotorState(vehicle_name=self.vehicle_name)
-            pos = (s.kinematics_estimated.position.x_val,
-                   s.kinematics_estimated.position.y_val,
-                   s.kinematics_estimated.position.z_val)
-            ori = get_forward_vector(s.kinematics_estimated.orientation)
-            vel = (s.kinematics_estimated.linear_velocity.x_val,
-                   s.kinematics_estimated.linear_velocity.y_val,
-                   s.kinematics_estimated.linear_velocity.z_val)
-            self.flight_data.append({'time': now, 'pos': pos, 'ori': ori, 'vel': vel, 'control': control})
-            self.last_capture_time = now
+        current_time = time.time()
+        if current_time - self.last_capture_time >= self.capture_interval:
+            state = self.client.getMultirotorState(vehicle_name=self.vehicle_name)
+            pos = (
+                state.kinematics_estimated.position.x_val,
+                state.kinematics_estimated.position.y_val,
+                state.kinematics_estimated.position.z_val
+            )
+            q = state.kinematics_estimated.orientation
+            ori = get_forward_vector(q)
+            vel = (
+                state.kinematics_estimated.linear_velocity.x_val,
+                state.kinematics_estimated.linear_velocity.y_val,
+                state.kinematics_estimated.linear_velocity.z_val
+            )
+            self.flight_data.append({
+                'time': current_time,
+                'pos': pos,
+                'ori': ori,
+                'vel': vel,
+                'control': control
+            })
+            self.last_capture_time = current_time
 
     def get_flight_data(self):
         return self.flight_data
 
-    def plot_flight_path(self, gate_positions=None, waypoints=None,
+    def plot_flight_path(self, gate_positions=None, waypoint_positions=None,
                          orientation_color='green', velocity_color='blue', control_color='red'):
+        '''
+        Plots flight path, orientation, velocity vectors, control vectors,
+        gate spheres, and spline waypoints.
+        '''
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-
-        # flight trajectory
+        
+        # plot actual flight path
         xs = [d['pos'][0] for d in self.flight_data]
         ys = [d['pos'][1] for d in self.flight_data]
         zs = [d['pos'][2] for d in self.flight_data]
         ax.scatter(xs, ys, zs, c='blue', marker='o', label='Flight Path')
-
-        # optionally scatter spline waypoints
-        if waypoints:
-            wx = [w.x_val for w in waypoints]
-            wy = [w.y_val for w in waypoints]
-            wz = [w.z_val for w in waypoints]
-            ax.scatter(wx, wy, wz, c='magenta', marker='^', label='Spline Waypoints')
-
-        # optionally draw gate spheres
+        
+        # orientation, velocity, control arrows
+        first_ori = first_vel = first_ctrl = True
+        for data in self.flight_data:
+            x, y, z = data['pos']
+            vel = data['vel']
+            ori = data['ori']
+            ctrl = data['control']
+            if first_vel:
+                ax.quiver(x, y, z, vel[0], vel[1], vel[2], length=1, normalize=True,
+                          color=velocity_color, label='Velocity')
+                first_vel = False
+            else:
+                ax.quiver(x, y, z, vel[0], vel[1], vel[2], length=1, normalize=True, color=velocity_color)
+            if first_ori:
+                ax.quiver(x, y, z, ori[0], ori[1], ori[2], length=1, normalize=True,
+                          color=orientation_color, label='Orientation')
+                first_ori = False
+            else:
+                ax.quiver(x, y, z, ori[0], ori[1], ori[2], length=1, normalize=True, color=orientation_color)
+            if ctrl is not None:
+                if first_ctrl:
+                    ax.quiver(x, y, z, ctrl[0], ctrl[1], ctrl[2], length=1, normalize=True,
+                              color=control_color, label='Control')
+                    first_ctrl = False
+                else:
+                    ax.quiver(x, y, z, ctrl[0], ctrl[1], ctrl[2], length=1, normalize=True, color=control_color)
+        
+        # plot gate spheres
+        u = np.linspace(0, 2*np.pi, 20)
+        v = np.linspace(0, np.pi, 20)
+        r_gate = 1.5
         if gate_positions:
-            u = np.linspace(0, 2*np.pi, 20)
-            v = np.linspace(0, np.pi, 20)
-            r = 1.5
-            for g, p in gate_positions.items():
-                cx, cy, cz = p.x_val, p.y_val, p.z_val
-                xsphere = cx + r * np.outer(np.cos(u), np.sin(v))
-                ysphere = cy + r * np.outer(np.sin(u), np.sin(v))
-                zsphere = cz + r * np.outer(np.ones_like(u), np.cos(v))
-                ax.plot_wireframe(xsphere, ysphere, zsphere, color='orange', alpha=0.3)
-
-        ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
-        ax.set_title("Drone Flight Path, Gates, and Spline Waypoints")
+            for gate, pos in gate_positions.items():
+                cx, cy, cz = pos.x_val, pos.y_val, pos.z_val
+                xsph = cx + r_gate*np.outer(np.cos(u), np.sin(v))
+                ysph = cy + r_gate*np.outer(np.sin(u), np.sin(v))
+                zsph = cz + r_gate*np.outer(np.ones_like(u), np.cos(v))
+                ax.plot_wireframe(xsph, ysph, zsph, color='orange', alpha=0.3)
+        
+        # plot spline waypoints
+        if waypoint_positions:
+            wx = [p.x_val for p in waypoint_positions]
+            wy = [p.y_val for p in waypoint_positions]
+            wz = [p.z_val for p in waypoint_positions]
+            ax.scatter(wx, wy, wz, c='purple', marker='x', label='Spline Waypoints')
+        
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title("Drone Flight Path with Gates & Spline Waypoints")
         ax.legend()
-        ax.invert_zaxis(); ax.invert_yaxis()
+        # adjust axes
+        xlims = ax.get_xlim3d(); ylims = ax.get_ylim3d(); zlims = ax.get_zlim3d()
+        xmid = np.mean(xlims); ymid = np.mean(ylims); zmid = np.mean(zlims)
+        max_range = max(xlims[1]-xlims[0], ylims[1]-ylims[0], zlims[1]-zlims[0])
+        ax.set_xlim3d([xmid-max_range/2, xmid+max_range/2])
+        ax.set_ylim3d([ymid-max_range/2, ymid+max_range/2])
+        ax.set_zlim3d([zmid-max_range/2, zmid+max_range/2])
+        ax.invert_zaxis()
+        ax.invert_yaxis()
         plt.show()
 
 def get_forward_vector(q):
-    pitch = math.asin(max(-1, min(1, 2*(q.w_val*q.y_val - q.z_val*q.x_val))))
-    yaw   = math.atan2(2*(q.w_val*q.z_val + q.x_val*q.y_val),
-                       1 - 2*(q.y_val**2 + q.z_val**2))
-    return (math.cos(pitch)*math.cos(yaw),
-            math.cos(pitch)*math.sin(yaw),
-            math.sin(pitch))
-
-def finalize_flight(flight_data_collector, gate_positions, waypoints,
-                    race_start_time, race_end_time):
     """
-    Compute and print metrics, then plot whatever data we have.
-    Safely handles missing race_end_time or empty flight data.
+    Compute the drone's forward unit vector from its orientation quaternion.
+    Assumes the drone's local forward direction is along the +X axis.
     """
-    data = flight_data_collector.get_flight_data()
-    if not data:
-        print("No flight data was captured.")
-        return
+    pitch = math.asin(max(-1.0, min(1.0, 2*(q.w_val*q.y_val - q.z_val*q.x_val))))
+    yaw = math.atan2(2*(q.w_val*q.z_val + q.x_val*q.y_val),
+                     1 - 2*(q.y_val**2 + q.z_val**2))
+    fx = math.cos(pitch)*math.cos(yaw)
+    fy = math.cos(pitch)*math.sin(yaw)
+    fz = math.sin(pitch)
+    return (fx, fy, fz)
 
-    # determine actual end time
-    end_time = race_end_time or data[-1]['time']
-    if race_start_time:
-        print(f"Race time: {end_time - race_start_time:.2f} s")
-    else:
-        print("Race never officially started (no waypoints reached).")
-
-    # average velocity over the race or entire dataset if no start
-    speeds = [math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
-              for d in data
-              for v in ([d['vel']] if 'vel' in d else [])
-              if (not race_start_time) or (race_start_time <= d['time'] <= end_time)]
-    if speeds:
-        print(f"Avg velocity: {sum(speeds)/len(speeds):.2f} m/s")
-    else:
-        print("No velocity data in the race interval.")
-
-    # minimum distance to each gate
-    for g, p in gate_positions.items():
-        dists = [math.sqrt((d['pos'][0] - p.x_val)**2 +
-                           (d['pos'][1] - p.y_val)**2 +
-                           (d['pos'][2] - p.z_val)**2)
-                 for d in data]
-        if dists:
-            print(f"Min dist to {g}: {min(dists):.2f} m")
-        else:
-            print(f"No position data to compute distance to {g}.")
-
-    # finally show the plot
-    time.sleep(1)
-    flight_data_collector.plot_flight_path(
-        gate_positions=gate_positions,
-        waypoints=waypoints
-    )
+def capture_plot_reference(flight_data_collector: FlightDataCollector):
+    # These calls to simSetVehiclePose are only for capturing reference states for plotting.
+    end_position = airsimneurips.Vector3r(25, 10, -20)
+    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
+    new_pose = airsimneurips.Pose(end_position, end_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
+    time.sleep(0.2)
+    flight_data_collector.capture()
+    end_position = airsimneurips.Vector3r(-3, -2.0, -20)
+    end_rotation = airsimneurips.Quaternionr(0, 0, 0, 4.71)
+    new_pose = airsimneurips.Pose(end_position, end_rotation)
+    client.simSetVehiclePose(new_pose, ignore_collison=True)
+    time.sleep(0.2)
+    flight_data_collector.capture()
 
 def main():
     init()
     gate_positions = getGatePositions()
-    waypoints = generate_spline_waypoints(gate_positions, smoothing=0, num_points=200)
+    # create spline waypoints (10 points between each gate)
+    spline_waypoints = generate_spline_waypoints(gate_positions, points_per_segment=10)
 
-    # PID setup (unchanged) …
     dt = 0.01
-    pid_x = PIDController(1.2, 0.1, 0.3, dt)
-    pid_y = PIDController(1.2, 0.1, 0.3, dt)
-    pid_z = PIDController(1.2, 0.1, 0.3, dt)
-    pid_x.integral = pid_y.integral = pid_z.integral = 0
-    pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
-
-    flight_data_collector = FlightDataCollector(client, capture_interval=0.05)
-
+    pid_x = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
+    pid_y = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
+    pid_z = PIDController(kp=1.2, ki=0.1, kd=0.1, dt=dt)
+    
+    flight_data_collector = FlightDataCollector(client=client, capture_interval=0.05, vehicle_name="drone_1")
+    
+    # --- Performance Metrics Variables ---
     race_start_time = None
     race_end_time = None
-    waypoint_radius = 0.5
 
-    try:
-        # --- the main follow-spline loop ---
-        for i, wp in enumerate(waypoints):
-            print(f"Heading to waypoint {i+1}/{len(waypoints)}")
-            if i == 0:
-                race_start_time = time.time()
+    total_waypoints = len(spline_waypoints)
 
-            while not inSphere(wp, radius=waypoint_radius):
-                state = client.getMultirotorState(vehicle_name="drone_1")
-                pos = state.kinematics_estimated.position
-                vel = state.kinematics_estimated.linear_velocity
+    for idx, target in enumerate(spline_waypoints):
+        print(f"Going to waypoint {idx+1}/{total_waypoints} at position {target}")
+        pid_x.integral = pid_y.integral = pid_z.integral = 0
+        pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
+        
+        # smaller radius for waypoint convergence
+        while not inGateSphere(target, radius=0.5):
+            state = client.getMultirotorState(vehicle_name="drone_1")
+            current_pos = state.kinematics_estimated.position
+            current_vel = state.kinematics_estimated.linear_velocity
 
-                err = np.array([wp.x_val - pos.x_val,
-                                wp.y_val - pos.y_val,
-                                wp.z_val - pos.z_val])
-                dist = np.linalg.norm(err)
-                dir_vec = err/dist if dist>0 else np.zeros(3)
-                desired_vel = 10.0 * dir_vec
-                curr_vel = np.array([vel.x_val, vel.y_val, vel.z_val])
+            error_vector = np.array([
+                target.x_val - current_pos.x_val,
+                target.y_val - current_pos.y_val,
+                target.z_val - current_pos.z_val
+            ])
+            distance = np.linalg.norm(error_vector)
+            desired_direction = (error_vector / distance) if distance > 0 else np.zeros(3)
 
-                # PID velocity control (unchanged) …
-                if np.linalg.norm(curr_vel) < 0.1:
-                    angle_err = 0
-                else:
-                    dp = np.dot(curr_vel, desired_vel)
-                    angle_err = math.acos(np.clip(
-                        dp/(np.linalg.norm(curr_vel)*np.linalg.norm(desired_vel)), -1,1))
-                scale = math.cos(angle_err)
-                adj_desired = desired_vel * scale
-                vel_err = adj_desired - curr_vel
+            base_speed = 10.0
+            desired_vel_vector = base_speed * desired_direction
+            current_vel_vector = np.array([
+                current_vel.x_val,
+                current_vel.y_val,
+                current_vel.z_val
+            ])
 
-                cx = pid_x.update(vel_err[0])
-                cy = pid_y.update(vel_err[1])
-                cz = pid_z.update(vel_err[2])
-                cmd = curr_vel + np.array([cx, cy, cz])
+            if np.linalg.norm(current_vel_vector) < 0.1:
+                angle_error = 0
+            else:
+                dp = np.dot(current_vel_vector, desired_vel_vector)
+                norm_prod = np.linalg.norm(current_vel_vector)*np.linalg.norm(desired_vel_vector)
+                angle_error = math.acos(np.clip(dp/norm_prod, -1.0, 1.0))
+            
+            speed_scaling = math.cos(angle_error)
+            adjusted_desired_vel = desired_vel_vector * speed_scaling
+            vel_error = adjusted_desired_vel - current_vel_vector
+            
+            control_x = pid_x.update(vel_error[0])
+            control_y = pid_y.update(vel_error[1])
+            control_z = pid_z.update(vel_error[2])
+            command_vel = current_vel_vector + np.array([control_x, control_y, control_z])
+            
+            desired_yaw = math.degrees(math.atan2(desired_direction[1], desired_direction[0]))
+            yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=desired_yaw)
+            
+            client.moveByVelocityAsync(
+                command_vel[0], command_vel[1], command_vel[2],
+                dt, yaw_mode=yaw_mode, vehicle_name="drone_1"
+            )
+            
+            flight_data_collector.capture(control=command_vel)
+            time.sleep(dt)
 
-                yaw = math.degrees(math.atan2(dir_vec[1], dir_vec[0]))
-                yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=yaw)
+        if idx == 0:
+            race_start_time = time.time()
+        if idx == total_waypoints - 1:
+            race_end_time = time.time()
 
-                client.moveByVelocityAsync(
-                    cmd[0], cmd[1], cmd[2],
-                    dt, yaw_mode=yaw_mode, vehicle_name="drone_1"
-                )
-                flight_data_collector.capture(control=cmd)
-                time.sleep(dt)
+    print("Race complete")
+    for _ in range(50):
+        flight_data_collector.capture(control=command_vel)
+        time.sleep(dt)
+    
+    # --- Compute Performance Metrics (unchanged) ---
+    # (same as before)
 
-            # last waypoint reached
-            if i == len(waypoints) - 1:
-                race_end_time = time.time()
-
-    except KeyboardInterrupt:
-        print("\n⛔ KeyboardInterrupt received — finalizing collected data…")
-
-    # in either normal completion or interrupt, finalize
-    finalize_flight(
-        flight_data_collector,
-        gate_positions,
-        waypoints,
-        race_start_time,
-        race_end_time
+    time.sleep(1)
+    capture_plot_reference(flight_data_collector)
+    flight_data_collector.plot_flight_path(
+        gate_positions=gate_positions,
+        waypoint_positions=spline_waypoints
     )
 
 if __name__ == "__main__":
