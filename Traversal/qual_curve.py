@@ -370,7 +370,7 @@ def main():
             pid_x.integral = pid_y.integral = pid_z.integral = 0
             pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
 
-            while not inGateSphere(target, radius=1):
+            while not inGateSphere(target):
                 state = client.getMultirotorState(vehicle_name="drone_1")
                 pos = state.kinematics_estimated.position
                 vel = state.kinematics_estimated.linear_velocity
