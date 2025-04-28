@@ -261,7 +261,7 @@ def get_forward_vector(q):
     fz = math.sin(pitch)
     return (fx, fy, fz)
 
-def compute_curvature(waypoints, idx, lookahead=8):
+def compute_curvature(waypoints, idx, lookahead=15):
     """
     Returns the average turning angle (radians) between the next `lookahead` segments
     starting at waypoint index `idx`.
