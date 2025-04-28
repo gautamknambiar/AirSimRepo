@@ -137,107 +137,132 @@ def get_forward_vector(q):
             math.cos(pitch)*math.sin(yaw),
             math.sin(pitch))
 
+def finalize_flight(flight_data_collector, gate_positions, waypoints,
+                    race_start_time, race_end_time):
+    """
+    Compute and print metrics, then plot whatever data we have.
+    Safely handles missing race_end_time or empty flight data.
+    """
+    data = flight_data_collector.get_flight_data()
+    if not data:
+        print("No flight data was captured.")
+        return
+
+    # determine actual end time
+    end_time = race_end_time or data[-1]['time']
+    if race_start_time:
+        print(f"Race time: {end_time - race_start_time:.2f} s")
+    else:
+        print("Race never officially started (no waypoints reached).")
+
+    # average velocity over the race or entire dataset if no start
+    speeds = [math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+              for d in data
+              for v in ([d['vel']] if 'vel' in d else [])
+              if (not race_start_time) or (race_start_time <= d['time'] <= end_time)]
+    if speeds:
+        print(f"Avg velocity: {sum(speeds)/len(speeds):.2f} m/s")
+    else:
+        print("No velocity data in the race interval.")
+
+    # minimum distance to each gate
+    for g, p in gate_positions.items():
+        dists = [math.sqrt((d['pos'][0] - p.x_val)**2 +
+                           (d['pos'][1] - p.y_val)**2 +
+                           (d['pos'][2] - p.z_val)**2)
+                 for d in data]
+        if dists:
+            print(f"Min dist to {g}: {min(dists):.2f} m")
+        else:
+            print(f"No position data to compute distance to {g}.")
+
+    # finally show the plot
+    time.sleep(1)
+    flight_data_collector.plot_flight_path(
+        gate_positions=gate_positions,
+        waypoints=waypoints
+    )
+
 def main():
     init()
     gate_positions = getGatePositions()
+    waypoints = generate_spline_waypoints(gate_positions, smoothing=0, num_points=200)
 
-    # generate spline waypoints through all gates
-    waypoints = generate_spline_waypoints(gate_positions,
-                                          smoothing=0,    # no smoothing error
-                                          num_points=200) # adjust density as needed
-
-    # PID setup
+    # PID setup (unchanged) …
     dt = 0.01
     pid_x = PIDController(1.2, 0.1, 0.1, dt)
     pid_y = PIDController(1.2, 0.1, 0.1, dt)
     pid_z = PIDController(1.2, 0.1, 0.1, dt)
-
-    # reset PID integrals once
     pid_x.integral = pid_y.integral = pid_z.integral = 0
     pid_x.previous_error = pid_y.previous_error = pid_z.previous_error = 0
 
     flight_data_collector = FlightDataCollector(client, capture_interval=0.05)
 
-    # race timing will be from first to last waypoint
     race_start_time = None
     race_end_time = None
-
     waypoint_radius = 0.5
 
-    # follow the spline
-    for i, wp in enumerate(waypoints):
-        print(f"Heading to waypoint {i+1}/{len(waypoints)}: {wp}")
-        # record start time on first waypoint
-        if i == 0:
-            race_start_time = time.time()
-        # fly until within radius of this waypoint
-        while not inSphere(wp, radius=waypoint_radius):
-            state = client.getMultirotorState(vehicle_name="drone_1")
-            pos = state.kinematics_estimated.position
-            vel = state.kinematics_estimated.linear_velocity
+    try:
+        # --- the main follow-spline loop ---
+        for i, wp in enumerate(waypoints):
+            print(f"Heading to waypoint {i+1}/{len(waypoints)}")
+            if i == 0:
+                race_start_time = time.time()
 
-            err = np.array([wp.x_val - pos.x_val,
-                            wp.y_val - pos.y_val,
-                            wp.z_val - pos.z_val])
-            dist = np.linalg.norm(err)
-            dir_vec = err/dist if dist>0 else np.zeros(3)
-            desired_vel = 10.0 * dir_vec
-            curr_vel = np.array([vel.x_val, vel.y_val, vel.z_val])
+            while not inSphere(wp, radius=waypoint_radius):
+                state = client.getMultirotorState(vehicle_name="drone_1")
+                pos = state.kinematics_estimated.position
+                vel = state.kinematics_estimated.linear_velocity
 
-            # angle-based speed scaling
-            if np.linalg.norm(curr_vel) < 0.1:
-                angle_err = 0
-            else:
-                dp = np.dot(curr_vel, desired_vel)
-                angle_err = math.acos(np.clip(dp/(np.linalg.norm(curr_vel)*np.linalg.norm(desired_vel)), -1,1))
-            scale = math.cos(angle_err)
-            adj_desired = desired_vel * scale
-            vel_err = adj_desired - curr_vel
+                err = np.array([wp.x_val - pos.x_val,
+                                wp.y_val - pos.y_val,
+                                wp.z_val - pos.z_val])
+                dist = np.linalg.norm(err)
+                dir_vec = err/dist if dist>0 else np.zeros(3)
+                desired_vel = 10.0 * dir_vec
+                curr_vel = np.array([vel.x_val, vel.y_val, vel.z_val])
 
-            cx = pid_x.update(vel_err[0])
-            cy = pid_y.update(vel_err[1])
-            cz = pid_z.update(vel_err[2])
-            cmd = curr_vel + np.array([cx, cy, cz])
+                # PID velocity control (unchanged) …
+                if np.linalg.norm(curr_vel) < 0.1:
+                    angle_err = 0
+                else:
+                    dp = np.dot(curr_vel, desired_vel)
+                    angle_err = math.acos(np.clip(
+                        dp/(np.linalg.norm(curr_vel)*np.linalg.norm(desired_vel)), -1,1))
+                scale = math.cos(angle_err)
+                adj_desired = desired_vel * scale
+                vel_err = adj_desired - curr_vel
 
-            yaw = math.degrees(math.atan2(dir_vec[1], dir_vec[0]))
-            yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=yaw)
+                cx = pid_x.update(vel_err[0])
+                cy = pid_y.update(vel_err[1])
+                cz = pid_z.update(vel_err[2])
+                cmd = curr_vel + np.array([cx, cy, cz])
 
-            client.moveByVelocityAsync(cmd[0], cmd[1], cmd[2],
-                                       dt, yaw_mode=yaw_mode, vehicle_name="drone_1")
-            flight_data_collector.capture(control=cmd)
-            time.sleep(dt)
+                yaw = math.degrees(math.atan2(dir_vec[1], dir_vec[0]))
+                yaw_mode = airsimneurips.YawMode(is_rate=False, yaw_or_rate=yaw)
 
-        # record end time on last waypoint
-        if i == len(waypoints)-1:
-            race_end_time = time.time()
+                client.moveByVelocityAsync(
+                    cmd[0], cmd[1], cmd[2],
+                    dt, yaw_mode=yaw_mode, vehicle_name="drone_1"
+                )
+                flight_data_collector.capture(control=cmd)
+                time.sleep(dt)
 
-    print("Completed following spline path.")
-    # post‐race captures
-    for _ in range(50):
-        flight_data_collector.capture()
-        time.sleep(dt)
+            # last waypoint reached
+            if i == len(waypoints) - 1:
+                race_end_time = time.time()
 
-    # compute race metrics
-    if race_start_time and race_end_time:
-        print(f"Race time: {race_end_time - race_start_time:.2f} s")
-    data = flight_data_collector.get_flight_data()
-    speeds = [np.linalg.norm(d['vel']) for d in data
-              if race_start_time <= d['time'] <= race_end_time]
-    if speeds:
-        print(f"Avg velocity: {sum(speeds)/len(speeds):.2f} m/s")
+    except KeyboardInterrupt:
+        print("\n⛔ KeyboardInterrupt received — finalizing collected data…")
 
-    # min distance to each gate
-    for g, p in gate_positions.items():
-        md = min(math.sqrt((d['pos'][0]-p.x_val)**2 +
-                           (d['pos'][1]-p.y_val)**2 +
-                           (d['pos'][2]-p.z_val)**2)
-                 for d in data)
-        print(f"Min dist to {g}: {md:.2f} m")
-
-    # final plot
-    time.sleep(1)
-    flight_data_collector.plot_flight_path(gate_positions=gate_positions,
-                                           waypoints=waypoints)
+    # in either normal completion or interrupt, finalize
+    finalize_flight(
+        flight_data_collector,
+        gate_positions,
+        waypoints,
+        race_start_time,
+        race_end_time
+    )
 
 if __name__ == "__main__":
     main()
