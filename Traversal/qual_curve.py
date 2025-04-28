@@ -8,8 +8,8 @@ from mpl_toolkits.mplot3d import Axes3D              # new: enables 3D plotting 
 
 client = airsimneurips.MultirotorClient()
 
-MAX_SPEED = 15.0   # m/s when perfectly straight
-MIN_SPEED =  5.0   # m/s when very sharp turn
+MAX_SPEED = 10.0   # m/s when perfectly straight
+MIN_SPEED =  3.0   # m/s when very sharp turn
 CURVATURE_CAP = math.pi  # maximum possible average turn (~180° per segment)
 
 def init():
