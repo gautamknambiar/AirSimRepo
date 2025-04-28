@@ -22,7 +22,7 @@ def init():
     client.enableApiControl(vehicle_name="drone_1")
     client.arm(vehicle_name="drone_1")
     time.sleep(1)
-    start_position = airsimneurips.Vector3r(1.3731292486190796, 81.43741607666016, -44)
+    start_position = airsimneurips.Vector3r(1.3731292486190796, 81.43741607666016, -44.5)
     start_rotation = airsimneurips.Quaternionr(0, 0, -0.17364919185638428, 0.984807550907135)
     new_pose = airsimneurips.Pose(start_position, start_rotation)
     client.simSetVehiclePose(new_pose, ignore_collison=True)
