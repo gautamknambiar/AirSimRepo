@@ -145,11 +145,13 @@ class FlightDataCollector:
         return self.flight_data
 
     def plot_flight_path(self, gate_positions=None, waypoint_positions=None,
-                         orientation_color='green', velocity_color='blue', control_color='red'):
+                     orientation_color='green', velocity_color='blue', control_color='red'):
         '''
         Plots flight path, orientation, velocity vectors, control vectors,
-        gate spheres, and spline waypoints.
+        gate spheres, and spline waypoints — now with per-arrow value annotations.
         '''
+        import numpy as np
+
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
@@ -159,32 +161,54 @@ class FlightDataCollector:
         zs = [d['pos'][2] for d in self.flight_data]
         ax.scatter(xs, ys, zs, c='blue', marker='o', label='Flight Path')
         
-        # orientation, velocity, control arrows
         first_ori = first_vel = first_ctrl = True
         for data in self.flight_data:
             x, y, z = data['pos']
-            vel = data['vel']
+            vel = np.array(data['vel'])
             ori = data['ori']
             ctrl = data['control']
+            
+            # — Velocity quiver + annotation —
+            vel_norm = np.linalg.norm(vel)
+            vel_dir = vel / vel_norm if vel_norm > 0 else vel
             if first_vel:
-                ax.quiver(x, y, z, vel[0], vel[1], vel[2], length=1, normalize=True,
-                          color=velocity_color, label='Velocity')
+                ax.quiver(x, y, z, vel_dir[0], vel_dir[1], vel_dir[2],
+                        length=1, normalize=False, color=velocity_color, label='Velocity')
                 first_vel = False
             else:
-                ax.quiver(x, y, z, vel[0], vel[1], vel[2], length=1, normalize=True, color=velocity_color)
+                ax.quiver(x, y, z, vel_dir[0], vel_dir[1], vel_dir[2],
+                        length=1, normalize=False, color=velocity_color)
+            # annotate the actual velocity vector components at the tip
+            ax.text(x + vel_dir[0], y + vel_dir[1], z + vel_dir[2],
+                    f"vel=({vel[0]:.2f},{vel[1]:.2f},{vel[2]:.2f})",
+                    color=velocity_color, fontsize=8)
+            
+            # — Orientation quiver (unchanged) —
             if first_ori:
-                ax.quiver(x, y, z, ori[0], ori[1], ori[2], length=1, normalize=True,
-                          color=orientation_color, label='Orientation')
+                ax.quiver(x, y, z, ori[0], ori[1], ori[2],
+                        length=1, normalize=True, color=orientation_color, label='Orientation')
                 first_ori = False
             else:
-                ax.quiver(x, y, z, ori[0], ori[1], ori[2], length=1, normalize=True, color=orientation_color)
+                ax.quiver(x, y, z, ori[0], ori[1], ori[2],
+                        length=1, normalize=True, color=orientation_color)
+            
+            # — Control quiver + annotation —
             if ctrl is not None:
+                ctrl_arr = np.array(ctrl)
+                ctrl_norm = np.linalg.norm(ctrl_arr)
+                ctrl_dir = ctrl_arr / ctrl_norm if ctrl_norm > 0 else ctrl_arr
+                
                 if first_ctrl:
-                    ax.quiver(x, y, z, ctrl[0], ctrl[1], ctrl[2], length=1, normalize=True,
-                              color=control_color, label='Control')
+                    ax.quiver(x, y, z, ctrl_dir[0], ctrl_dir[1], ctrl_dir[2],
+                            length=1, normalize=False, color=control_color, label='Control')
                     first_ctrl = False
                 else:
-                    ax.quiver(x, y, z, ctrl[0], ctrl[1], ctrl[2], length=1, normalize=True, color=control_color)
+                    ax.quiver(x, y, z, ctrl_dir[0], ctrl_dir[1], ctrl_dir[2],
+                            length=1, normalize=False, color=control_color)
+                # annotate the actual control vector components
+                ax.text(x + ctrl_dir[0], y + ctrl_dir[1], z + ctrl_dir[2],
+                        f"ctrl=({ctrl_arr[0]:.2f},{ctrl_arr[1]:.2f},{ctrl_arr[2]:.2f})",
+                        color=control_color, fontsize=8)
         
         # plot gate spheres
         u = np.linspace(0, 2*np.pi, 20)
@@ -208,18 +232,21 @@ class FlightDataCollector:
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-        ax.set_title("Drone Flight Path with Gates & Spline Waypoints")
+        ax.set_title("Drone Flight Path with Gates, Velocity & Control Annotations")
         ax.legend()
-        # adjust axes
-        xlims = ax.get_xlim3d(); ylims = ax.get_ylim3d(); zlims = ax.get_zlim3d()
-        xmid = np.mean(xlims); ymid = np.mean(ylims); zmid = np.mean(zlims)
+        
+        # equalize axes
+        xlims, ylims, zlims = ax.get_xlim3d(), ax.get_ylim3d(), ax.get_zlim3d()
+        xmid, ymid, zmid = np.mean(xlims), np.mean(ylims), np.mean(zlims)
         max_range = max(xlims[1]-xlims[0], ylims[1]-ylims[0], zlims[1]-zlims[0])
         ax.set_xlim3d([xmid-max_range/2, xmid+max_range/2])
         ax.set_ylim3d([ymid-max_range/2, ymid+max_range/2])
         ax.set_zlim3d([zmid-max_range/2, zmid+max_range/2])
         ax.invert_zaxis()
         ax.invert_yaxis()
+        
         plt.show()
+
 
 def get_forward_vector(q):
     """
