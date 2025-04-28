@@ -291,16 +291,7 @@ def main():
                 current_vel.z_val
             ])
 
-            if np.linalg.norm(current_vel_vector) < 0.1:
-                angle_error = 0
-            else:
-                dp = np.dot(current_vel_vector, desired_vel_vector)
-                norm_prod = np.linalg.norm(current_vel_vector)*np.linalg.norm(desired_vel_vector)
-                angle_error = math.acos(np.clip(dp/norm_prod, -1.0, 1.0))
-            
-            speed_scaling = math.cos(angle_error)
-            adjusted_desired_vel = desired_vel_vector * speed_scaling
-            vel_error = adjusted_desired_vel - current_vel_vector
+            vel_error = desired_vel_vector - current_vel_vector
             
             control_x = pid_x.update(vel_error[0])
             control_y = pid_y.update(vel_error[1])
@@ -328,8 +319,49 @@ def main():
         flight_data_collector.capture(control=command_vel)
         time.sleep(dt)
     
-    # --- Compute Performance Metrics (unchanged) ---
-    # (same as before)
+    # --- Compute Performance Metrics ---
+    if race_start_time is not None and race_end_time is not None:
+        race_time = race_end_time - race_start_time
+        print(f"Race completion time (first gate to last gate): {race_time:.2f} seconds")
+    else:
+        print("Race timing not recorded properly.")
+    
+    # Average velocity (using captured flight data between race start and end)
+    flight_entries = flight_data_collector.get_flight_data()
+    speeds = []
+    for entry in flight_entries:
+        t = entry['time']
+        if race_start_time <= t <= race_end_time:
+            vel = entry['vel']
+            speed = np.linalg.norm(vel)
+            speeds.append(speed)
+    if speeds:
+        avg_velocity = sum(speeds) / len(speeds)
+        print(f"Average velocity between first and last gate: {avg_velocity:.2f} m/s")
+    else:
+        print("No velocity data recorded between first and last gate.")
+    
+    # --- Compute Average Minimum Distance to Each Gate (Post Race) ---
+    gate_min_distances = []
+    for gate, pos in gate_positions.items():
+        min_distance = float('inf')
+        # For each flight data position, compute the distance to the gate position.
+        for data in flight_entries:
+            flight_pos = data['pos']
+            dx = flight_pos[0] - pos.x_val
+            dy = flight_pos[1] - pos.y_val
+            dz = flight_pos[2] - pos.z_val
+            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if distance < min_distance:
+                min_distance = distance
+        gate_min_distances.append(min_distance)
+        print(f"Minimum distance to {gate}: {min_distance:.2f} meters")
+    
+    if gate_min_distances:
+        avg_min_distance = sum(gate_min_distances) / len(gate_min_distances)
+        print(f"Average minimum distance to each gate: {avg_min_distance:.2f} meters")
+    else:
+        print("No gate distance data recorded.")
 
     time.sleep(1)
     capture_plot_reference(flight_data_collector)
